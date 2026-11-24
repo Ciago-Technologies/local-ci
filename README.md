@@ -23,8 +23,8 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 0 — repo setup.**
-> `capture` and `diff` are stubs in this phase. The real fingerprinting lands in Phase 1. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: Phase 1 — MVP `capture` + `diff` works.**
+> See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Why LocalCI, not another CI runner?
 
@@ -46,16 +46,35 @@ go build -o localci .
 ./localci --help
 ```
 
-## Usage (Phase 0)
+## Usage
 
 ```bash
 localci --help
 localci --version
-localci capture   # Phase 1: writes a fingerprint to stdout
-localci diff a.json b.json  # Phase 1: shows the differences
+
+# On your laptop, in your repo:
+localci capture -o local.json
+# In CI, same command:
+localci capture -o ci.json
+
+localci diff local.json ci.json
+# Exit 0 when they match, 1 when differences are found.
+
+localci diff --json local.json ci.json  # machine-readable output
+localci capture --dir /path/to/repo    # fingerprint a different directory
 ```
 
-Right now `capture` and `diff` print a clear "coming in Phase 1" message and exit non-zero, so nothing pretends to work before it does.
+Example output:
+
+```text
+Found 4 difference(s) — local vs CI:
+  env:STRIPE_KEY: local = set, CI = (missing)  (missing in CI)
+  lockfile:package-lock.json: local = a1b2c3d4e5f6, CI = d4e5f6a1b2c3  (lockfile changed — run the package manager install step again)
+  runtime:node: local = 20.11.0, CI = 20.9.0
+  timezone: local = Asia/Kolkata, CI = UTC
+```
+
+CPU and memory differences are reported with `[info]` — a laptop and a CI runner rarely have the same hardware, so they don't count as a likely cause on their own.
 
 ## What gets fingerprinted (Phase 1)
 
