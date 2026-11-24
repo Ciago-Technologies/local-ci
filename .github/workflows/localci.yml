@@ -7,19 +7,20 @@
 # PR changes a runtime or lockfile the laptop doesn't have, the check
 # fails with the diff and a fix suggestion.
 name: LocalCI dogfood
-
 on:
   pull_request:
-
 jobs:
   localci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     env:
       LOCALCI_DOGFOOD_TEST: "1"
     steps:
       - uses: actions/checkout@v4
       - name: LocalCI check
-        uses: Ciago-Technologies/local-ci@v0.7.1
+        uses: Ciago-Technologies/local-ci@v0.7.2
         with:
           local-fingerprint: .localci/local.json
           workflows-dir: .github/workflows
