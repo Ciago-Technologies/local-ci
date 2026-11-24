@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="LocalCI logo" width="180">
+</p>
+
 # LocalCI
 
 [![CI](https://github.com/Ciago-Technologies/local-ci/actions/workflows/ci.yml/badge.svg)](https://github.com/Ciago-Technologies/local-ci/actions/workflows/ci.yml)

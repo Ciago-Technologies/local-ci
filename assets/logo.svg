@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>LocalCI — local-first CI debugger</title>
+  <defs>
+    <!-- Dark tile: deep navy to violet -->
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1226"/>
+      <stop offset="0.55" stop-color="#131A3D"/>
+      <stop offset="1" stop-color="#2A1B5E"/>
+    </linearGradient>
+    <!-- Edge: cyan to violet -->
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <!-- Flow: the pipeline, local (cyan) to CI (violet).
+         userSpaceOnUse: a horizontal line has a zero-height
+         bounding box, which breaks objectBoundingBox gradients
+         in some renderers. -->
+    <linearGradient id="flow" gradientUnits="userSpaceOnUse" x1="100" y1="256" x2="412" y2="256">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <!-- Check node -->
+    <linearGradient id="check" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Tile -->
+  <rect x="24" y="24" width="464" height="464" rx="120" fill="url(#tile)" stroke="url(#edge)" stroke-width="2.5"/>
+
+  <!-- Orbit ring -->
+  <circle cx="256" cy="256" r="196" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2" stroke-dasharray="1 14" stroke-linecap="round"/>
+  <circle cx="256" cy="60" r="7" fill="#22D3EE"/>
+  <circle cx="452" cy="256" r="7" fill="#A855F7"/>
+
+  <!-- Pipeline: soft halo + the gradient line itself -->
+  <line x1="100" y1="256" x2="412" y2="256" stroke="#6366F1" stroke-opacity="0.30" stroke-width="46" stroke-linecap="round"/>
+  <line x1="100" y1="256" x2="412" y2="256" stroke="url(#flow)" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Node 1: local -->
+  <circle cx="132" cy="256" r="36" fill="#0B1226" stroke="#22D3EE" stroke-width="6"/>
+  <circle cx="132" cy="256" r="12" fill="#22D3EE"/>
+
+  <!-- Node 2: the workflow -->
+  <circle cx="256" cy="256" r="36" fill="#0B1226" stroke="#818CF8" stroke-width="6"/>
+  <circle cx="256" cy="256" r="12" fill="#818CF8"/>
+
+  <!-- Node 3: verified in CI -->
+  <circle cx="380" cy="256" r="46" fill="url(#check)"/>
+  <path d="M352 258 L374 280 L410 238" fill="none" stroke="#FFFFFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
