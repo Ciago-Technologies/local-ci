@@ -1,8 +1,6 @@
 // Package fingerprint defines the environment fingerprint LocalCI
 // captures locally and in CI, and compares with diff.
 //
-// Phase 0: types only. Collection logic lands in Phase 1.
-//
 // Privacy rule: env var names only, never values. This is enforced
 // by the type itself — there is no field for a secret value.
 package fingerprint
@@ -39,4 +37,9 @@ type Fingerprint struct {
 	// CaseSensitive reports whether the filesystem distinguishes
 	// "README.md" from "readme.md".
 	CaseSensitive bool `json:"case_sensitive"`
+
+	// CPUCount is runtime.NumCPU() — logical CPUs visible to the process.
+	CPUCount int `json:"cpu_count,omitempty"`
+	// MemoryMB is total system memory in MiB, 0 when it cannot be determined.
+	MemoryMB int64 `json:"memory_mb,omitempty"`
 }
