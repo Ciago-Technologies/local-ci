@@ -170,3 +170,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Good-first-issues will be added after Ph
 ## License
 
 Dual-licensed under **Apache-2.0 / MIT**, per Ciago Technologies org policy. See `LICENSE-APACHE` and `LICENSE-MIT`.
+
+<!-- dogfood test PR: triggers the LocalCI check -->
