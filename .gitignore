@@ -1,0 +1,17 @@
+# Binaries
+/localci
+localci
+*.exe
+*.test
+*.out
+
+# Go build cache (not the module cache)
+/vendor/
+
+# OS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
