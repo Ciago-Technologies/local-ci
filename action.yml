@@ -1,0 +1,121 @@
+# LocalCI GitHub Action
+#
+# Captures a fingerprint in CI and compares it with a baseline
+# fingerprint committed from a developer's laptop.
+#
+# Setup (2 minutes):
+#   1. On your laptop, in your repo:
+#        localci capture -o .localci/local.json
+#        git add .localci/local.json && git commit -m "Add LocalCI baseline"
+#   2. Copy examples/pr-check.yml to .github/workflows/localci.yml
+#      in your repo.
+#
+# The action builds localci from source (no release download needed),
+# captures ci.json, diffs it against the baseline, uploads both
+# fingerprints as artifacts, comments the diff on the PR, and fails
+# the check when differences are found (unless fail-on-diff is false).
+#
+# Note: this action never sees env var values — localci only records
+# env var names, never values.
+name: LocalCI
+description: Find out in CI why it differs from local — before you merge.
+author: Ciago Technologies
+
+inputs:
+  local-fingerprint:
+    description: Path to the baseline fingerprint committed from a laptop.
+    required: false
+    default: .localci/local.json
+  fail-on-diff:
+    description: Fail the check when differences are found ('true' or 'false').
+    required: false
+    default: 'true'
+  comment-on-pr:
+    description: Comment the diff on the pull request ('true' or 'false').
+    required: false
+    default: 'true'
+
+outputs:
+  has-differences:
+    description: "'true' when the CI fingerprint differs from the baseline."
+    value: ${{ steps.diff.outputs.has-differences }}
+  diff:
+    description: The human-readable diff output (empty when they match).
+    value: ${{ steps.diff.outputs.diff }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Build localci
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        go build -o "${{ runner.temp }}/localci" .
+
+    - name: Capture CI fingerprint
+      shell: bash
+      run: |
+        "${{ runner.temp }}/localci" capture -o ci.json
+
+    - id: diff
+      name: Compare with local fingerprint
+      shell: bash
+      run: |
+        LOCALCI="${{ runner.temp }}/localci"
+        BASELINE="${{ inputs.local-fingerprint }}"
+        if [ ! -f "$BASELINE" ]; then
+          echo "No baseline fingerprint at $BASELINE."
+          echo "Run 'localci capture -o $BASELINE' on your laptop and commit it."
+          echo "has-differences=false" >> "$GITHUB_OUTPUT"
+          echo "diff=" >> "$GITHUB_OUTPUT"
+          printf '# LocalCI\n\nNo baseline fingerprint found at `%s`.\n\nRun `localci capture -o %s` on your laptop and commit it, then re-run this check.\n' "$BASELINE" "$BASELINE" > localci-diff.md
+          exit 0
+        fi
+        set +e
+        "$LOCALCI" diff "$BASELINE" ci.json > localci-diff.txt 2>&1
+        DIFF_EXIT=$?
+        set -e
+        {
+          echo "diff<<LOCALCI_DIFF_EOF"
+          cat localci-diff.txt
+          echo "LOCALCI_DIFF_EOF"
+        } >> "$GITHUB_OUTPUT"
+        {
+          echo '# LocalCI — local vs CI'
+          echo ''
+          echo '```'
+          cat localci-diff.txt
+          echo '```'
+        } > localci-diff.md
+        if [ "$DIFF_EXIT" -eq 1 ]; then
+          echo "has-differences=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "has-differences=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Upload fingerprints
+      uses: actions/upload-artifact@v4
+      with:
+        name: localci-fingerprints
+        path: |
+          ci.json
+          localci-diff.md
+        if-no-files-found: warn
+
+    - name: Comment diff on PR
+      if: github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && steps.diff.outputs.has-differences == 'true'
+      shell: bash
+      run: |
+        gh pr comment "${{ github.event.pull_request.number }}" --body-file localci-diff.md || echo "Could not post PR comment (forks and permissions can block this); the diff is in the job log and artifacts."
+
+    - name: Fail on differences
+      if: steps.diff.outputs.has-differences == 'true' && inputs.fail-on-diff == 'true'
+      shell: bash
+      run: |
+        echo "LocalCI found differences between local and CI. See the diff above, the PR comment, or the localci-fingerprints artifact."
+        exit 1
