@@ -2,10 +2,12 @@
 # Simulate the LocalCI GitHub Action locally.
 #
 # Replays the action's steps (build, capture, diff, artifacts) for
-# three scenarios, without needing GitHub Actions or `act`:
+# four scenarios, without needing GitHub Actions or `act`:
 #   1. match     — baseline and CI fingerprints match → check passes
 #   2. mismatch  — they differ → check fails with a diff
 #   3. missing   — no baseline → warning, check passes
+#   4. workflow-aware — same mismatch, but with --workflows the
+#      diff only shows what the job actually uses (3 of 7)
 #
 # Usage: ./scripts/simulate-action.sh
 # Requires: go 1.23+, bash. Exits non-zero if any scenario misbehaves.
@@ -57,9 +59,29 @@ run_scenario "mismatch" "$FIX/local.json" "$FIX/ci.json" 1
 # 3. Missing baseline: no local.json at all.
 run_scenario "missing" "" "$FIX/ci.json" 0
 
+# 4. Workflow-aware: same mismatch, filtered to what the job uses.
+echo ""
+echo "== Scenario: workflow-aware (expect exit 1, 3 shown, 4 hidden) =="
+mkdir -p "$TMP/workflow-aware"
+cp "$FIX/local.json" "$TMP/workflow-aware/local.json"
+cp "$FIX/ci.json" "$TMP/workflow-aware/ci.json"
+"$TMP/localci" diff --workflows "$ROOT/internal/workflow/testdata" \
+  "$TMP/workflow-aware/local.json" "$TMP/workflow-aware/ci.json" > "$TMP/workflow-aware/diff.txt" 2>&1
+got_exit=$?
+cat "$TMP/workflow-aware/diff.txt"
+if [ "$got_exit" -ne 1 ]; then
+  echo "FAIL: scenario workflow-aware exited $got_exit, want 1"
+  fail=1
+elif ! grep -q "Found 3 difference(s)" "$TMP/workflow-aware/diff.txt" || ! grep -q "4 difference(s) hidden" "$TMP/workflow-aware/diff.txt"; then
+  echo "FAIL: scenario workflow-aware did not show 3 diffs + 4 hidden"
+  fail=1
+else
+  echo "PASS: scenario workflow-aware"
+fi
+
 echo ""
 if [ "$fail" -ne 0 ]; then
   echo "SIMULATION FAILED"
   exit 1
 fi
-echo "SIMULATION PASSED: 3/3 scenarios"
+echo "SIMULATION PASSED: 4/4 scenarios"

@@ -8,7 +8,12 @@ Find out in CI why it differs from local — before you merge.
 2. On every PR, the action captures a fresh fingerprint in CI
 3. It diffs the two, comments the diff on the PR, uploads both fingerprints as artifacts, and fails the check when they differ
 
-It never sees env var values — `localci` only records env var **names**.
+It never sees env var values — `localci` only records env var **names** (unless you opt in with `--include-values` for specific safe vars at capture time).
+
+The diff is **workflow-aware** (Phase 3): it reads `.github/workflows`
+and only reports mismatches in runtimes / env vars the jobs actually
+use. Each difference has a severity (`critical` / `warning` / `info`)
+and a suggested fix.
 
 ## Setup (2 minutes)
 
@@ -29,6 +34,7 @@ Copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your repo, pu
 | `local-fingerprint` | `.localci/local.json` | Path to the baseline fingerprint |
 | `fail-on-diff` | `'true'` | Fail the check when differences are found |
 | `comment-on-pr` | `'true'` | Comment the diff on the pull request |
+| `workflows-dir` | `.github/workflows` | Workflow directory for workflow-aware diffing; set to `''` to show all differences |
 
 ## Outputs
 
@@ -42,7 +48,8 @@ Copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your repo, pu
 - **Baseline missing:** the check passes with a warning and tells you how to create the baseline. It does not fail your first PR.
 - **Differences found:** the diff is in the job log, as a PR comment, and in the `localci-fingerprints` artifact (`ci.json` + `localci-diff.md`). The check fails unless `fail-on-diff` is `'false'`.
 - **No differences:** the check passes silently.
-- **CPU / memory:** reported as `[info]` in the diff. A laptop and a CI runner rarely have the same hardware, so treat those lines as context, not as a failure cause.
+- **CPU / memory:** reported as `[info]` in the diff, and hidden by workflow-aware diffing. A laptop and a CI runner rarely have the same hardware, so treat those lines as context, not as a failure cause.
+- **Severity:** `[critical]` (missing env/runtime, major version change, lockfile drift) is the most likely cause of a CI failure; `[warning]` (minor version drift, timezone, locale) may be; `[info]` usually isn't. Every difference also carries a `Fix:` suggestion.
 
 ## Updating the baseline
 

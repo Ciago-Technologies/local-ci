@@ -15,8 +15,14 @@
 # fingerprints as artifacts, comments the diff on the PR, and fails
 # the check when differences are found (unless fail-on-diff is false).
 #
+# Phase 3: the diff is workflow-aware — it reads .github/workflows
+# and only reports mismatches in runtimes / env vars the jobs
+# actually use. Each difference carries a severity (critical /
+# warning / info) and a suggested fix.
+#
 # Note: this action never sees env var values — localci only records
-# env var names, never values.
+# env var names, never values (unless you opt in with
+# --include-values for specific safe vars at capture time).
 name: LocalCI
 description: Find out in CI why it differs from local — before you merge.
 author: Ciago Technologies
@@ -34,6 +40,10 @@ inputs:
     description: Comment the diff on the pull request ('true' or 'false').
     required: false
     default: 'true'
+  workflows-dir:
+    description: Workflow directory to read for workflow-aware diffing. Set to '' to disable.
+    required: false
+    default: .github/workflows
 
 outputs:
   has-differences:
@@ -77,7 +87,11 @@ runs:
           exit 0
         fi
         set +e
-        "$LOCALCI" diff "$BASELINE" ci.json > localci-diff.txt 2>&1
+        DIFF_ARGS=()
+        if [ -n "${{ inputs.workflows-dir }}" ] && [ -d "${{ inputs.workflows-dir }}" ]; then
+          DIFF_ARGS+=(--workflows "${{ inputs.workflows-dir }}")
+        fi
+        "$LOCALCI" diff "${DIFF_ARGS[@]}" "$BASELINE" ci.json > localci-diff.txt 2>&1
         DIFF_EXIT=$?
         set -e
         {

@@ -15,11 +15,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Ciago-Technologies/local-ci/internal/fingerprint"
+	"github.com/Ciago-Technologies/local-ci/internal/workflow"
 )
 
-const version = "0.2.0-phase2"
+const version = "0.3.0-phase3"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -49,14 +51,19 @@ func usage() {
 Usage:
   localci --help                  Show this help
   localci --version               Show version
-  localci capture [--dir DIR] [-o FILE]
+  localci capture [--dir DIR] [-o FILE] [--include-values VAR,...]
                                   Capture an environment fingerprint as JSON.
                                   Writes to stdout unless -o is given.
-  localci diff [--json] <a.json> <b.json>
+                                  --include-values records values only for
+                                  the named vars (e.g. NODE_ENV,TZ).
+  localci diff [--json] [--workflows DIR] [--show-unused] <a.json> <b.json>
                                   Compare two fingerprints. Exits 1 when
                                   differences are found, 0 when they match.
+                                  --workflows hides differences in things
+                                  no workflow job uses (false positives).
 
-No secrets: LocalCI records env var names only, never values.
+No secrets: LocalCI records env var names only, never values,
+unless you explicitly opt in with --include-values.
 `)
 }
 
@@ -65,6 +72,7 @@ func runCapture(args []string) int {
 	fs.SetOutput(os.Stderr)
 	dir := fs.String("dir", ".", "directory to fingerprint (repo root)")
 	outPath := fs.String("o", "", "write JSON to FILE instead of stdout")
+	includeValues := fs.String("include-values", "", "comma-separated env var names whose values to record (e.g. NODE_ENV,TZ)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -73,7 +81,11 @@ func runCapture(args []string) int {
 		return 2
 	}
 
-	fp, err := fingerprint.Capture(*dir)
+	var opts fingerprint.CaptureOptions
+	if *includeValues != "" {
+		opts.IncludeValues = strings.Split(*includeValues, ",")
+	}
+	fp, err := fingerprint.CaptureWithOptions(*dir, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "localci capture: %v\n", err)
 		return 2
@@ -99,11 +111,13 @@ func runDiff(args []string) int {
 	fs := flag.NewFlagSet("diff", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	asJSON := fs.Bool("json", false, "print differences as JSON")
+	workflowsDir := fs.String("workflows", "", "workflow directory (e.g. .github/workflows) — hide differences in things no job uses")
+	showUnused := fs.Bool("show-unused", false, "with --workflows, show the hidden differences too")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if fs.NArg() != 2 {
-		fmt.Fprintln(os.Stderr, "localci diff: usage: localci diff [--json] <a.json> <b.json>")
+		fmt.Fprintln(os.Stderr, "localci diff: usage: localci diff [--json] [--workflows DIR] <a.json> <b.json>")
 		return 2
 	}
 	a, err := loadFingerprint(fs.Arg(0))
@@ -118,6 +132,19 @@ func runDiff(args []string) int {
 	}
 
 	diffs := fingerprint.Diff(a, b)
+	var hidden []fingerprint.Difference
+	if *workflowsDir != "" {
+		usage, err := workflow.ParseDir(*workflowsDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci diff: warning: cannot read workflows in %s (%v) — showing all differences\n", *workflowsDir, err)
+		} else if usage.HasWorkflows() {
+			diffs, hidden = fingerprint.ApplyWorkflow(diffs, usage)
+			if *showUnused {
+				diffs = append(diffs, hidden...)
+				hidden = nil
+			}
+		}
+	}
 	if *asJSON {
 		data, err := json.MarshalIndent(diffs, "", "  ")
 		if err != nil {
@@ -126,7 +153,7 @@ func runDiff(args []string) int {
 		}
 		fmt.Println(string(data))
 	} else {
-		fmt.Print(fingerprint.FormatHuman(diffs, "local", "CI"))
+		fmt.Print(fingerprint.FormatHumanWithHidden(diffs, hidden, "local", "CI"))
 	}
 	if len(diffs) == 0 {
 		return 0

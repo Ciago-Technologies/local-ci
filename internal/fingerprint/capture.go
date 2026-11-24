@@ -36,9 +36,22 @@ var skipDirs = map[string]bool{
 	".localci":     true,
 }
 
+// CaptureOptions tunes what Capture records.
+type CaptureOptions struct {
+	// IncludeValues names env vars whose values may be recorded
+	// (e.g. NODE_ENV, TZ). Names only by default; this is an
+	// explicit opt-in list, never a wildcard.
+	IncludeValues []string `json:"-"`
+}
+
 // Capture takes a fingerprint of dir (usually the repo root).
 // It never records env var values, file contents, or secrets.
 func Capture(dir string) (*Fingerprint, error) {
+	return CaptureWithOptions(dir, CaptureOptions{})
+}
+
+// CaptureWithOptions is Capture with explicit options.
+func CaptureWithOptions(dir string, opts CaptureOptions) (*Fingerprint, error) {
 	if dir == "" {
 		dir = "."
 	}
@@ -60,6 +73,21 @@ func Capture(dir string) (*Fingerprint, error) {
 		CaseSensitive: caseSensitive(abs),
 		CPUCount:      runtime.NumCPU(),
 		MemoryMB:      totalMemoryMB(),
+	}
+	if len(opts.IncludeValues) > 0 {
+		fp.EnvValues = map[string]string{}
+		for _, name := range opts.IncludeValues {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			if v, ok := os.LookupEnv(name); ok {
+				fp.EnvValues[name] = v
+			}
+		}
+		if len(fp.EnvValues) == 0 {
+			fp.EnvValues = nil
+		}
 	}
 	return fp, nil
 }

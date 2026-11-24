@@ -1,8 +1,10 @@
 // Package fingerprint defines the environment fingerprint LocalCI
 // captures locally and in CI, and compares with diff.
 //
-// Privacy rule: env var names only, never values. This is enforced
-// by the type itself — there is no field for a secret value.
+// Privacy rule: env var names only, never values — unless the user
+// explicitly opts in with --include-values for specific, safe vars
+// (e.g. NODE_ENV, TZ). Values are never collected by default, and
+// there is no way to opt in to all values at once.
 package fingerprint
 
 import "time"
@@ -30,6 +32,11 @@ type Fingerprint struct {
 	// EnvNames is the sorted list of environment variable names.
 	// Values are never collected.
 	EnvNames []string `json:"env_names"`
+
+	// EnvValues holds values for vars the user explicitly opted in
+	// to with --include-values (e.g. NODE_ENV, TZ). Empty by default.
+	// Never put a secret here — the flag takes a short explicit list.
+	EnvValues map[string]string `json:"env_values,omitempty"`
 
 	// Lockfiles maps a lockfile path to its SHA-256 hash.
 	Lockfiles map[string]string `json:"lockfiles,omitempty"`

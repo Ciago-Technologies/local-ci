@@ -33,18 +33,61 @@ Exit criteria: a real "passes locally, fails in CI" case is diagnosed in under a
 
 Exit criteria: a user can copy one workflow file and get a LocalCI check on their next PR.
 
-## Phase 3 — Fix suggestions
+## Phase 3 — Workflow-aware diff + fixes (done 2026-11-24)
 
-- A small database of common culprits: runtime version mismatch, timezone UTC vs local, missing env name, lockfile drift, case-sensitive filename
-- Each diff line gets a suggested fix, not just a difference
+Revised after a gap review (2026-11-24): Phase 1–2 showed a diff, but
+didn't say why CI would fail, and flagged harmless mismatches (timezone,
+CPU) the same way as a missing secret. Phase 3 fixes that:
 
-## Phase 4 — Run the failing step locally
+- [x] `internal/workflow`: parse `.github/workflows/*.yml` — runtimes
+      (`setup-node` / `setup-go` / `setup-python` / ...), `runs-on`,
+      `strategy.matrix`, `services`, and env var names from job/step env
+- [x] `localci diff --workflows DIR`: only show mismatches in things a
+      job actually uses; hide the rest (`--show-unused` to see them).
+      Fail-open: unparsable workflows or no workflows = show everything.
+- [x] Severity ranking: `critical` (missing env/runtime, major version
+      change, lockfile drift), `warning` (minor version drift, timezone,
+      locale, OS), `info` (CPU/memory)
+- [x] Each diff line gets a suggested fix (`Fix` field in JSON, `Fix:`
+      line in human output)
+- [x] `localci capture --include-values NODE_ENV,TZ`: opt-in values for
+      explicitly named, safe vars only — a wrong value is a critical diff
+- [x] Release binary: `.goreleaser.yml` + `examples/release.yml` (copy
+      to `.github/workflows/release.yml` manually; tag `v*` to publish)
+- [x] Action: new `workflows-dir` input (default `.github/workflows`),
+      passed to `diff`; docs updated
+- [x] Tests: 10+ passing (workflow parser, workflow filtering,
+      severity, fixes, env-value opt-in); demo: 7 fixture diffs → 3
+      shown, 4 hidden with `--workflows`
+
+Exit criteria: a diff now reads as "this job will fail because X",
+with a fix — not "here are 7 differences, good luck".
+
+## Phase 4 — Matrix + baseline freshness
+
+- Multiple baselines (one per OS / runtime matrix entry), picked by
+  the workflow's `strategy.matrix`
+- Fingerprint the runner image version; warn when the baseline is
+  older than the runner image
+- Baseline staleness warning (e.g. baseline older than 30 days)
+
+## Phase 5 — Fingerprint coverage
+
+- Runner image + Docker image version, system packages
+- Rust / Java / Ruby / .NET versions
+- Service versions (Postgres, Redis, ...) from the workflow's
+  `services:` block
+- Lockfile detail: which package changed, not just the hash
+- Line endings, file permissions, symlinks
+
+## Phase 6 — Run the failing step locally
 
 - Optional: run a single command in a container matching the CI image, using the fingerprint to pick the image
-- Explicitly out of scope for Phases 1–3 — do not build a full `act` clone
+- Explicitly out of scope for Phases 1–5 — do not build a full `act` clone
 
-## Phase 5 — Launch
+## Phase 7 — Launch
 
+- Dogfood the Action on real repos; GitLab support
 - Demo video / GIF: 30-second aha moment
 - Docs site / README polish, good-first-issues, submit to awesome lists
 - Measure: stars, installs, issues from real repos — not just our own
@@ -52,5 +95,6 @@ Exit criteria: a user can copy one workflow file and get a LocalCI check on thei
 ## Non-goals
 
 - Running full GitHub Actions workflows locally
-- Collecting env var values, secrets, or credentials — ever
+- Collecting env var values or secrets by default — values only with
+  an explicit `--include-values` opt-in for named vars; never secrets
 - A server, daemon, or hosted service

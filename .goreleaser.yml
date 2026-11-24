@@ -1,0 +1,27 @@
+# GoReleaser config — builds release binaries for LocalCI.
+# Tag a release (git tag v0.3.0 && git push --tags) and the release
+# workflow (examples/release.yml) publishes binaries for
+# linux / macOS / Windows, amd64 + arm64.
+# https://goreleaser.com
+version: 2
+
+builds:
+  - main: .
+    binary: localci
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+archives:
+  - name_template: "localci_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  use: github

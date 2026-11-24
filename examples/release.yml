@@ -1,0 +1,35 @@
+# Release workflow — copy this file to .github/workflows/release.yml
+# in your repo (GitHub Apps cannot write workflow files, so this
+# lives in examples/ and you add it manually via the web UI).
+#
+# On every tag push (v0.3.0, v1, ...), GoReleaser builds release
+# binaries for linux / macOS / Windows (amd64 + arm64) and publishes
+# them as a GitHub release. Requires GoReleaser, which is free for
+# open-source repos.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

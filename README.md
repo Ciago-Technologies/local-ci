@@ -23,7 +23,7 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 2 — GitHub Action works.**
+> **Status: Phase 3 — workflow-aware diff + fixes.**
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ACTION.md](docs/ACTION.md).
 
 ## Why LocalCI, not another CI runner?
@@ -37,7 +37,9 @@ Tools like `act` run your whole pipeline locally. LocalCI does the opposite, sma
 
 ## Install
 
-Phase 0 has no release binary yet. To build from source (Go 1.23+):
+Release binaries (linux / macOS / Windows, amd64 + arm64) are built
+by GoReleaser on every `v*` tag — see [examples/release.yml](examples/release.yml).
+Until the first tagged release, build from source (Go 1.23+):
 
 ```bash
 git clone https://github.com/Ciago-Technologies/local-ci.git
@@ -62,19 +64,33 @@ localci diff local.json ci.json
 
 localci diff --json local.json ci.json  # machine-readable output
 localci capture --dir /path/to/repo    # fingerprint a different directory
+
+# Workflow-aware: only warn about runtimes / env vars the jobs
+# in .github/workflows actually use. Timezone, CPU, and other
+# unused mismatches are hidden (use --show-unused to see them).
+localci diff --workflows .github/workflows local.json ci.json
+
+# Opt-in values for named, safe vars only (never by default):
+localci capture --include-values NODE_ENV,TZ -o local.json
 ```
 
-Example output:
+Example output (workflow-aware — 7 raw differences, 3 that matter):
 
 ```text
-Found 4 difference(s) — local vs CI:
-  env:STRIPE_KEY: local = set, CI = (missing)  (missing in CI)
-  lockfile:package-lock.json: local = a1b2c3d4e5f6, CI = d4e5f6a1b2c3  (lockfile changed — run the package manager install step again)
-  runtime:node: local = 20.11.0, CI = 20.9.0
-  timezone: local = Asia/Kolkata, CI = UTC
+Found 3 difference(s) — local vs CI (2 critical, 1 warning, 0 info):
+  [critical] env:STRIPE_KEY: local = set, CI = (missing)  (missing in CI)
+      Fix: Add STRIPE_KEY in repo Settings > Secrets and variables > Actions, then re-run the workflow.
+  [critical] lockfile:package-lock.json: local = a1b2c3d4e5f6, CI = d4e5f6a1b2c3  (lockfile changed — run the package manager install step again)
+      Fix: Re-run the install step locally (npm ci / go mod tidy / pip install) and commit the updated lockfile.
+  [warning] runtime:node: local = 20.11.0, CI = 20.9.0
+      Fix: Pin node-version: 20.9.0 in the workflow, or update your local node to 20.9.0.
+4 difference(s) hidden — not used by any workflow job (use --show-unused to see them).
 ```
 
-CPU and memory differences are reported with `[info]` — a laptop and a CI runner rarely have the same hardware, so they don't count as a likely cause on their own.
+Each difference has a severity: **critical** (missing env/runtime,
+major version change, lockfile drift), **warning** (minor version
+drift, timezone, locale), **info** (CPU/memory — a laptop and a CI
+runner rarely have the same hardware).
 
 ## GitHub Action
 
@@ -101,12 +117,14 @@ Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 
 ## Roadmap
 
-- **Phase 0** — Repo, vision, CLI skeleton (this phase)
+- **Phase 0** — Repo, vision, CLI skeleton
 - **Phase 1** — MVP `capture` + `diff` CLI
 - **Phase 2** — GitHub Action: capture in CI, compare in PR
-- **Phase 3** — Fix suggestions for common mismatches
-- **Phase 4** — Run the failing step locally in a matching container
-- **Phase 5** — Launch: demo, docs, good-first-issues
+- **Phase 3** — Workflow-aware diff + fix suggestions + severity (done)
+- **Phase 4** — Matrix + baseline freshness
+- **Phase 5** — Fingerprint coverage (runtimes, services, lockfile detail)
+- **Phase 6** — Run the failing step locally in a matching container
+- **Phase 7** — Launch: demo, docs, GitLab, good-first-issues
 
 Full plan: [docs/ROADMAP.md](docs/ROADMAP.md)
 
