@@ -23,11 +23,15 @@ Exit criteria: repo is live, `go build ./...` passes in CI, scope is locked.
 
 Exit criteria: a real "passes locally, fails in CI" case is diagnosed in under a minute with a copy-pasteable diff.
 
-## Phase 2 — GitHub Action
+## Phase 2 — GitHub Action (done 2026-11-24)
 
-- `Ciago-Technologies/local-ci` action: `capture` in CI, upload fingerprint as artifact
-- Compare in PR: post the diff as a comment, or fail the check with the diff
-- Docs: one workflow snippet a user can copy in 2 minutes
+- [x] `Ciago-Technologies/local-ci` action (`action.yml`, composite): build from source, `capture` in CI, upload fingerprints as artifacts
+- [x] Compare in PR: post the diff as a comment, fail the check with the diff (`fail-on-diff`, `comment-on-pr` inputs)
+- [x] Baseline is a committed `.localci/local.json`; missing baseline warns and passes instead of failing the first PR
+- [x] Docs: one workflow snippet a user can copy in 2 minutes (`examples/pr-check.yml`, `docs/ACTION.md`)
+- [x] Tested locally with `scripts/simulate-action.sh`: match / mismatch / missing-baseline scenarios
+
+Exit criteria: a user can copy one workflow file and get a LocalCI check on their next PR.
 
 ## Phase 3 — Fix suggestions
 
