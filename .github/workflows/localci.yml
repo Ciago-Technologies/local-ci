@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: LocalCI check
-        uses: Ciago-Technologies/local-ci@v0.7.2
+        uses: Ciago-Technologies/local-ci@v0.7.3
         with:
           local-fingerprint: .localci/local.json
           workflows-dir: .github/workflows
