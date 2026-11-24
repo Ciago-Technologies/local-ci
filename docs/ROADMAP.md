@@ -190,6 +190,18 @@ step's fallback emit a `::warning::` annotation instead of a plain
 echo, so a failed comment is visible in the run UI rather than
 silently swallowed.
 
+## v0.7.3 — Dogfood fix, part 3 (done)
+
+The verified PR #2 comment showed a second, real diff: the runner
+image had drifted two days after the baseline was captured
+(`ubuntu26/20261116.88.1` vs `...202.1`). GitHub updates runner
+images roughly weekly, so showing `runner_image` would fail every
+PR on image drift alone. The workflow filter now hides it (like
+cpu/memory); the `os` field and runtime versions still catch
+meaningful platform change, the staleness warning covers baseline
+age, and standalone `localci diff` still shows it. Tests: 45
+passing, simulation 9/9.
+
 Exit criteria: someone who has never seen LocalCI can install it,
 run the demo, and understand the point in 30 seconds — and the
 repo's own CI is green.

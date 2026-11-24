@@ -201,6 +201,57 @@ func TestApplyWorkflow_NoWorkflowsShowsAll(t *testing.T) {
 	}
 }
 
+func TestApplyWorkflow_HidesRunnerImage(t *testing.T) {
+	// Dogfood: the baseline's runner image drifted two days after
+	// capture (ubuntu26/20261116.88.1 vs ...202.1) and showed as a
+	// warning diff — GitHub updates images roughly weekly, so
+	// showing it would fail every PR on image drift alone.
+	local := loadFixture(t, "local.json")
+	ci := loadFixture(t, "ci.json")
+	local.RunnerImage = "ubuntu26/20261116.88.1"
+	ci.RunnerImage = "ubuntu26/20261116.202.1"
+	diffs := Diff(local, ci)
+	found := false
+	for _, d := range diffs {
+		if d.Field == "runner_image" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("want a runner_image diff before filtering")
+	}
+	usage := fakeUsage{
+		runtimes: map[string]bool{"node": true},
+		env:      map[string]bool{"STRIPE_KEY": true},
+		runsOn:   []string{"ubuntu-latest"},
+		found:    true,
+	}
+	shown, hidden := ApplyWorkflow(diffs, usage)
+	for _, d := range shown {
+		if d.Field == "runner_image" {
+			t.Error("runner_image diff shown by the workflow filter")
+		}
+	}
+	hiddenFields := map[string]bool{}
+	for _, d := range hidden {
+		hiddenFields[d.Field] = true
+	}
+	if !hiddenFields["runner_image"] {
+		t.Error("runner_image diff not hidden")
+	}
+	// Standalone diff (no workflows) still shows it.
+	shown, _ = ApplyWorkflow(diffs, fakeUsage{found: false})
+	found = false
+	for _, d := range shown {
+		if d.Field == "runner_image" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("runner_image diff hidden without workflows (fail-open broken)")
+	}
+}
+
 func TestIgnoreFields_GitCommit(t *testing.T) {
 	// Dogfood: a baseline's commit always differs from the PR head,
 	// so the Action ignores git_commit — otherwise every PR fails

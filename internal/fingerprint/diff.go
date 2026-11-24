@@ -224,6 +224,14 @@ type WorkflowUsage interface {
 //
 // Rules:
 //   - cpu/memory: always hidden (info only).
+//   - runner_image: always hidden. GitHub updates runner images
+//     roughly weekly, so a baseline's image drifts on every PR;
+//     showing it would fail every PR on image drift alone (dogfood
+//     caught this: baseline ubuntu26/20261116.88.1 vs CI
+//     ubuntu26/20261116.202.1, two days apart). The os field and
+//     runtime versions still catch meaningful platform change, and
+//     the baseline-staleness warning covers age. Standalone diff
+//     (no --workflows) still shows it.
 //   - runtime:X: shown only if a workflow uses X.
 //   - env:X: shown only if a workflow references X.
 //   - timezone: shown only if a workflow sets TZ; locale: only if
@@ -249,7 +257,8 @@ func ApplyWorkflow(diffs []Difference, usage WorkflowUsage) (shown, hidden []Dif
 
 func workflowUses(d Difference, usage WorkflowUsage) bool {
 	switch {
-	case d.Field == "cpu_count" || d.Field == "memory_mb":
+	case d.Field == "cpu_count" || d.Field == "memory_mb" ||
+		d.Field == "runner_image":
 		return false
 	case strings.HasPrefix(d.Field, "runtime:"):
 		return usage.UsedRuntime(strings.TrimPrefix(d.Field, "runtime:"))

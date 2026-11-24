@@ -169,9 +169,38 @@ else
   echo "PASS: scenario ignore-commit"
 fi
 
+# 9. Runner image drift is hidden by the workflow filter: identical
+#    except runner_image, with --workflows -> exit 0 (dogfood: the
+#    baseline's image drifted two days after capture; GitHub updates
+#    images roughly weekly, so showing it would fail every PR).
+echo ""
+echo "== Scenario: runner image drift hidden (expect exit 0) =="
+mkdir -p "$TMP/image-drift"
+python3 -c "
+import json
+d = json.load(open('$FIX/local.json'))
+d['runner_image'] = 'ubuntu26/20261116.88.1'
+json.dump(d, open('$TMP/image-drift/local.json', 'w'))
+d2 = json.load(open('$FIX/local.json'))
+d2['runner_image'] = 'ubuntu26/20261116.202.1'
+json.dump(d2, open('$TMP/image-drift/ci.json', 'w'))
+"
+"$TMP/localci" diff --workflows "$ROOT/internal/workflow/testdata" "$TMP/image-drift/local.json" "$TMP/image-drift/ci.json" > "$TMP/image-drift/diff.txt" 2>&1
+got_exit=$?
+cat "$TMP/image-drift/diff.txt"
+if [ "$got_exit" -ne 0 ]; then
+  echo "FAIL: scenario image-drift exited $got_exit, want 0"
+  fail=1
+elif ! grep -q "No differences" "$TMP/image-drift/diff.txt"; then
+  echo "FAIL: scenario image-drift did not report no differences"
+  fail=1
+else
+  echo "PASS: scenario image-drift"
+fi
+
 echo ""
 if [ "$fail" -ne 0 ]; then
   echo "SIMULATION FAILED"
   exit 1
 fi
-echo "SIMULATION PASSED: 8/8 scenarios"
+echo "SIMULATION PASSED: 9/9 scenarios"
