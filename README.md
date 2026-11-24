@@ -31,9 +31,10 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 7 — launch. Published on the GitHub Marketplace as v0.7.3.**
-> See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ACTION.md](docs/ACTION.md),
-> [docs/RUN.md](docs/RUN.md) and [docs/GITLAB.md](docs/GITLAB.md).
+> Available on the [GitHub Marketplace](https://github.com/marketplace/actions/ciago-localci)
+> — install with `uses: Ciago-Technologies/local-ci@v0.7.3`.
+> Docs: [Action](docs/ACTION.md), [Run a step locally](docs/RUN.md),
+> [GitLab](docs/GITLAB.md), [Demo](docs/DEMO.md).
 
 ## Why LocalCI, not another CI runner?
 
@@ -41,7 +42,7 @@ Tools like `act` run your whole pipeline locally. LocalCI does the opposite, sma
 
 - **Don't run all of CI locally. Find the difference.**
 - One static Go binary, no daemon, no server.
-- Works for Go, Node, Python, Rust — any repo with CI.
+- Works for Go, Node, Python, Rust, Java, Ruby, .NET — any repo with CI.
 - Built for the "works on my machine" moment, not for re-implementing GitHub Actions.
 
 ## Install
@@ -50,8 +51,6 @@ Tools like `act` run your whole pipeline locally. LocalCI does the opposite, sma
 go install github.com/Ciago-Technologies/local-ci@latest
 ```
 
-Release binaries (linux / macOS / Windows, amd64 + arm64) are built
-by GoReleaser on every `v*` tag — see [examples/release.yml](examples/release.yml).
 Or build from source (Go 1.23+):
 
 ```bash
@@ -136,7 +135,7 @@ git add .localci/local.json && git commit -m "Add LocalCI baseline"
 
 Then copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your repo. The action diffs CI against the baseline, comments the diff on the PR, uploads both fingerprints as artifacts, and fails the check when they differ.
 
-**Matrix builds:** capture one baseline per cell (`.localci/ubuntu-node20.json`, `.localci/macos-node22.json`, …) and use `baseline-dir: .localci` — the action picks the baseline matching each runner. See `examples/pr-check-matrix.yml`. The diff also warns when the baseline is older than 30 days, and when GitHub's runner image changed.
+**Matrix builds:** capture one baseline per cell (`.localci/ubuntu-node20.json`, `.localci/macos-node22.json`, …) and use `baseline-dir: .localci` — the action picks the baseline matching each runner. See `examples/pr-check-matrix.yml`. The diff also warns when the baseline is older than 30 days.
 
 Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 
@@ -150,22 +149,10 @@ Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 - Services from the workflow (`postgres:16`), Dockerfile base image
 - Git commit, file case-sensitivity, line endings, executable files, symlinks
 
-## Roadmap
-
-- **Phase 0** — Repo, vision, CLI skeleton
-- **Phase 1** — MVP `capture` + `diff` CLI
-- **Phase 2** — GitHub Action: capture in CI, compare in PR
-- **Phase 3** — Workflow-aware diff + fix suggestions + severity (done)
-- **Phase 4** — Matrix + baseline freshness (done)
-- **Phase 5** — Fingerprint coverage (runtimes, services, lockfile detail) (done)
-- **Phase 6** — Run the failing step locally in a matching container (done)
-- **Phase 7** — Launch: demo, docs, GitLab, good-first-issues
-
-Full plan: [docs/ROADMAP.md](docs/ROADMAP.md)
-
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Good-first-issues will be added after Phase 1 lands.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Good first issues to pick up
+are listed in [docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md).
 
 ## License
 
