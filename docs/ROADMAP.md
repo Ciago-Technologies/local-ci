@@ -175,6 +175,21 @@ real defects, all fixed here:
   head). New `localci diff --ignore` flag; the Action passes
   `--ignore git_commit`. Tests: 44 passing, simulation 8/8.
 
+## v0.7.2 — Dogfood fix, part 2 (done)
+
+v0.7.1 fixed the token but the comment still didn't post: `gh pr
+comment` failed with `GraphQL: Resource not accessible by
+integration (addComment)`. Root cause was in our own repo, not the
+Action: the dogfood workflow (`.github/workflows/localci.yml`,
+copied from `examples/dogfood.yml`) declared no `permissions:`,
+while the other examples did — so its token was read-only for pull
+requests. Fixed by adding `permissions: contents: read,
+pull-requests: write` to `examples/dogfood.yml` and documenting
+that the calling workflow must declare it. Also made the comment
+step's fallback emit a `::warning::` annotation instead of a plain
+echo, so a failed comment is visible in the run UI rather than
+silently swallowed.
+
 Exit criteria: someone who has never seen LocalCI can install it,
 run the demo, and understand the point in 30 seconds — and the
 repo's own CI is green.

@@ -14,10 +14,18 @@ on:
 jobs:
   localci:
     runs-on: ubuntu-latest
+    # Required for the PR comment: without pull-requests: write the
+    # default token is read-only and `gh pr comment` fails with
+    # "Resource not accessible by integration (addComment)" — this
+    # is what the v0.7.1 dogfood run caught (the example workflows
+    # had it, this file didn't).
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - name: LocalCI check
-        uses: Ciago-Technologies/local-ci@v0.7.1
+        uses: Ciago-Technologies/local-ci@v0.7.2
         with:
           local-fingerprint: .localci/local.json
           workflows-dir: .github/workflows

@@ -98,7 +98,7 @@ with no matching baseline warns and passes, like a missing baseline.
 No. The action builds `localci` from source with Go 1.23, so it works from `main` / a tag / a branch.
 
 **Which version should I pin?**
-`Ciago-Technologies/local-ci@v0.7.1` — the current Marketplace release.
+`Ciago-Technologies/local-ci@v0.7.2` — the current Marketplace release.
 `@v1` comes at launch, once the API is stable.
 
 **Does it work on forks?**
@@ -119,7 +119,13 @@ job log, only to the artifact; and `git_commit` was compared, which
 would have failed every PR on the commit alone.
 
 **What permissions does the workflow need?**
-`contents: read` and `pull-requests: write` (for the comment). See `examples/pr-check.yml`.
+`contents: read` and `pull-requests: write` (for the comment). See `examples/pr-check.yml`. This is not optional: without
+`pull-requests: write` on the calling job, the default token is
+read-only and the comment step fails with `GraphQL: Resource not
+accessible by integration (addComment)` — the action logs a
+`::warning::` and continues, but no comment is posted. The repo's
+own dogfood workflow shipped without this block and two test runs
+posted nothing (fixed in v0.7.2).
 
 **Can I use it without failing PRs?**
 Yes — set `fail-on-diff: 'false'`. You'll still get the diff as a comment and artifact.

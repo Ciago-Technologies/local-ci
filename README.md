@@ -31,7 +31,7 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 7 — launch. Published on the GitHub Marketplace as v0.7.1.**
+> **Status: Phase 7 — launch. Published on the GitHub Marketplace as v0.7.2.**
 > See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ACTION.md](docs/ACTION.md),
 > [docs/RUN.md](docs/RUN.md) and [docs/GITLAB.md](docs/GITLAB.md).
 

@@ -160,7 +160,11 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh pr comment "${{ github.event.pull_request.number }}" --body-file localci-diff.md || echo "Could not post PR comment (forks and permissions can block this); the diff is in the job log and artifacts."
+        # The fallback keeps fork PRs green (their token is read-only
+        # and cannot comment), but the failure must be visible: the
+        # plain echo used to hide it, and two dogfood runs silently
+        # posted nothing. A warning annotation shows up in the run UI.
+        gh pr comment "${{ github.event.pull_request.number }}" --body-file localci-diff.md || echo "::warning::Could not post PR comment (forks and permissions can block this); the diff is in the job log and artifacts."
 
     - name: Fail on differences
       if: steps.diff.outputs.has-differences == 'true' && inputs.fail-on-diff == 'true'
