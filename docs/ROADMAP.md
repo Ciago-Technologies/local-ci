@@ -81,8 +81,10 @@ with a fix — not "here are 7 differences, good luck".
 - [x] Tests: 17 passing (baseline pick, no-match error, staleness,
       runner image); demo: correct cell picked, 40-day-old baseline
       warns, runner image change shows as a warning diff
-- [ ] Publish to the GitHub Marketplace as release v0.4.0 (repo is
-      public; use the "Draft a release" banner, tag v0.4.0)
+- [x] Published to the GitHub Marketplace as release v0.4.1. (v0.4.0
+      was published as a plain release first; Marketplace publishing
+      failed because the action name "LocalCI" was not unique, so the
+      action was renamed to "Ciago LocalCI" and released as v0.4.1.)
 
 Exit criteria: a matrix build (Ubuntu + macOS, Node 20 + 22) compares
 each cell against its own baseline, and a stale baseline or a new

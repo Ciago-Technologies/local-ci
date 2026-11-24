@@ -35,6 +35,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-      - uses: Ciago-Technologies/local-ci@v0.4.0
+      - uses: Ciago-Technologies/local-ci@v0.4.1
         with:
           baseline-dir: .localci

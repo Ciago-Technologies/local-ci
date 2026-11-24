@@ -23,7 +23,7 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 4 — matrix + baseline freshness.**
+> **Status: Phase 4 — matrix + baseline freshness. Published on the GitHub Marketplace as v0.4.1.**
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ACTION.md](docs/ACTION.md).
 
 ## Why LocalCI, not another CI runner?

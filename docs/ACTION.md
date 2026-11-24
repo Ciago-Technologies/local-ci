@@ -96,7 +96,7 @@ with no matching baseline warns and passes, like a missing baseline.
 No. The action builds `localci` from source with Go 1.23, so it works from `main` / a tag / a branch.
 
 **Which version should I pin?**
-`Ciago-Technologies/local-ci@v0.4.0` — the first Marketplace release.
+`Ciago-Technologies/local-ci@v0.4.1` — the first Marketplace release.
 `@v1` comes at launch, once the API is stable.
 
 **Does it work on forks?**

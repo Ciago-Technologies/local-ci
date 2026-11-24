@@ -23,7 +23,7 @@
 # Note: this action never sees env var values — localci only records
 # env var names, never values (unless you opt in with
 # --include-values for specific safe vars at capture time).
-name: LocalCI
+name: Ciago LocalCI
 description: Find out in CI why it differs from local — before you merge.
 author: Ciago Technologies
 branding:
