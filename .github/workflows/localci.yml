@@ -1,0 +1,25 @@
+# Dogfood: LocalCI checks itself. Copy to
+# .github/workflows/localci.yml (via the GitHub web UI — the GitHub
+# App cannot write workflow files).
+#
+# On every PR, capture in CI and diff against the baseline committed
+# from a maintainer's laptop (.localci/local.json). If a contributor's
+# PR changes a runtime or lockfile the laptop doesn't have, the check
+# fails with the diff and a fix suggestion.
+name: LocalCI dogfood
+
+on:
+  pull_request:
+
+jobs:
+  localci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: LocalCI check
+        uses: Ciago-Technologies/local-ci@v0.7.0
+        with:
+          local-fingerprint: .localci/local.json
+          workflows-dir: .github/workflows
+          fail-on-diff: true
+          comment-on-pr: true
