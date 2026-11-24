@@ -2,9 +2,11 @@
 
 Thanks for helping make "works on my machine" a solved problem.
 
-## Phase 0 note
+## Good first issues
 
-This repo is in Phase 0 — skeleton only. `capture` and `diff` are stubs until Phase 1 lands. Please don't open large feature PRs yet; start with docs, typos, or a discussion issue.
+New here? Start with [docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md)
+— small, self-contained tasks with a clear "done when". Pick one,
+comment on the issue (or open it from the draft), and send a PR.
 
 ## How to contribute
 

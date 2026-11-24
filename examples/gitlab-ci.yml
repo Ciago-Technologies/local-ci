@@ -1,0 +1,28 @@
+# LocalCI on GitLab CI — capture in the job, diff against a baseline
+# committed from your laptop. Copy to .gitlab-ci.yml.
+#
+# LocalCI is just a Go binary: no GitHub-only features are used here.
+# The Action (action.yml) is GitHub-only; this file is the GitLab
+# equivalent, written in plain CI YAML.
+#
+# One-time setup on your laptop:
+#   localci capture -o .localci/local.json
+#   git add .localci/local.json && git commit -m "Add LocalCI baseline"
+
+stages:
+  - test
+
+localci-check:
+  stage: test
+  image: golang:1.23
+  script:
+    - go install github.com/Ciago-Technologies/local-ci@latest
+    - localci capture -o ci.json
+    - localci diff --workflows .github/workflows .localci/local.json ci.json
+  artifacts:
+    when: always
+    paths:
+      - ci.json
+  # Missing baseline? The diff fails with a clear error — commit
+  # .localci/local.json first (see above). To warn instead of fail,
+  # add `|| true` to the diff line.

@@ -1,8 +1,16 @@
 # LocalCI
 
+[![CI](https://github.com/Ciago-Technologies/local-ci/actions/workflows/ci.yml/badge.svg)](https://github.com/Ciago-Technologies/local-ci/actions/workflows/ci.yml)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Ciago%20LocalCI-blue)](https://github.com/marketplace/actions/ciago-localci)
+[![License](https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue)](LICENSE-APACHE)
+
 **Find out locally why CI will fail — before you push.**
 
 LocalCI is a local-first CI debugger from [Ciago Technologies](https://github.com/Ciago-Technologies).
+
+![LocalCI demo](docs/demo.gif)
+
+Run the demo yourself: `./scripts/demo.sh` — no Docker needed.
 
 Every developer has hit it: tests pass on your laptop, fail in CI. Or the opposite. You waste hours guessing — is it the Node version? The timezone? A missing env var? A file that only differs by case?
 
@@ -23,8 +31,9 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 5 — fingerprint coverage. Published on the GitHub Marketplace as v0.4.1.**
-> See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ACTION.md](docs/ACTION.md).
+> **Status: Phase 7 — launch. Published on the GitHub Marketplace as v0.4.1.**
+> See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ACTION.md](docs/ACTION.md),
+> [docs/RUN.md](docs/RUN.md) and [docs/GITLAB.md](docs/GITLAB.md).
 
 ## Why LocalCI, not another CI runner?
 
@@ -37,9 +46,13 @@ Tools like `act` run your whole pipeline locally. LocalCI does the opposite, sma
 
 ## Install
 
+```bash
+go install github.com/Ciago-Technologies/local-ci@latest
+```
+
 Release binaries (linux / macOS / Windows, amd64 + arm64) are built
 by GoReleaser on every `v*` tag — see [examples/release.yml](examples/release.yml).
-Until the first tagged release, build from source (Go 1.23+):
+Or build from source (Go 1.23+):
 
 ```bash
 git clone https://github.com/Ciago-Technologies/local-ci.git

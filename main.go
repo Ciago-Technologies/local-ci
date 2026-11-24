@@ -22,7 +22,7 @@ import (
 	"github.com/Ciago-Technologies/local-ci/internal/workflow"
 )
 
-const version = "0.6.0-phase6"
+const version = "0.7.0-phase7"
 
 func main() {
 	if len(os.Args) < 2 {
