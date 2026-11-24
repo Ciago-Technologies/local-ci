@@ -56,4 +56,33 @@ type Fingerprint struct {
 	// regularly — when it changes, the baseline goes stale even if
 	// nothing in the repo changed.
 	RunnerImage string `json:"runner_image,omitempty"`
+
+	// OSRelease is the OS distribution release, e.g. "ubuntu 24.04"
+	// (from /etc/os-release) or "macos 15.1" (from sw_vers). It
+	// distinguishes ubuntu-22.04 from 24.04, which plain GOOS cannot.
+	OSRelease string `json:"os_release,omitempty"`
+
+	// Services maps a service name to its image, e.g.
+	// postgres -> "postgres:16", taken from the repo's
+	// .github/workflows services: blocks. It records what the
+	// workflow asks for, not a live probe of a running server.
+	Services map[string]string `json:"services,omitempty"`
+
+	// ContainerImage is the base image from the repo's Dockerfile
+	// (the first FROM line), e.g. "node:20-alpine". Empty when the
+	// repo has no Dockerfile.
+	ContainerImage string `json:"container_image,omitempty"`
+
+	// LineEndings is "lf", "crlf", or "mixed", sampled from tracked
+	// text files. Empty when the repo is not a git checkout.
+	LineEndings string `json:"line_endings,omitempty"`
+	// ExecutableFiles is how many tracked files are executable.
+	ExecutableFiles int `json:"executable_files,omitempty"`
+	// Symlinks is how many tracked files are symlinks.
+	Symlinks int `json:"symlinks,omitempty"`
+
+	// LockfilePackages maps a lockfile path to package -> version,
+	// e.g. "package-lock.json" -> {"react": "18.2.0"}. The hash in
+	// Lockfiles says a lockfile changed; this says which packages.
+	LockfilePackages map[string]map[string]string `json:"lockfile_packages,omitempty"`
 }

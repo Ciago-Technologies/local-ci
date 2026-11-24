@@ -51,6 +51,8 @@ Copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your repo, pu
 - **No differences:** the check passes silently.
 - **CPU / memory:** reported as `[info]` in the diff, and hidden by workflow-aware diffing. A laptop and a CI runner rarely have the same hardware, so treat those lines as context, not as a failure cause.
 - **Severity:** `[critical]` (missing env/runtime, major version change, lockfile drift) is the most likely cause of a CI failure; `[warning]` (minor version drift, timezone, locale) may be; `[info]` usually isn't. Every difference also carries a `Fix:` suggestion.
+- **Lockfile detail:** when a lockfile changes, the diff names the packages — "react 18.2.0 → 18.3.0, axios added, moment removed" — instead of just showing two hashes. Supported: package-lock, yarn, pnpm, Cargo, poetry, Gemfile, composer, go.sum, Pipfile.
+- **Services & images:** the diff also covers workflow service images (`postgres:16`), the Dockerfile base image, and the OS release (`ubuntu 24.04`).
 
 ## Updating the baseline
 

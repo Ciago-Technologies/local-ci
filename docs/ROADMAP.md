@@ -90,14 +90,35 @@ Exit criteria: a matrix build (Ubuntu + macOS, Node 20 + 22) compares
 each cell against its own baseline, and a stale baseline or a new
 runner image is flagged instead of silently passing.
 
-## Phase 5 — Fingerprint coverage
+## Phase 5 — Fingerprint coverage (done 2026-11-24)
 
-- Runner image + Docker image version, system packages
-- Rust / Java / Ruby / .NET versions
-- Service versions (Postgres, Redis, ...) from the workflow's
-  `services:` block
-- Lockfile detail: which package changed, not just the hash
-- Line endings, file permissions, symlinks
+- [x] Runtimes: Rust (`rustc`), Java, Ruby, .NET added to `capture`
+      (Go / Node / Python were already there); the workflow parser
+      already knew their `setup-*` actions
+- [x] OS release: `os_release` from `/etc/os-release` (`ubuntu 24.04`)
+      or `sw_vers` on macOS — distinguishes 22.04 from 24.04
+- [x] Services: `services` map from the workflow's `services:` block
+      (name -> image, e.g. postgres -> `postgres:16`); Dockerfile
+      base image from the first `FROM` line
+- [x] Lockfile detail: `lockfile_packages` parsed for 9 formats
+      (package-lock.json incl. legacy layout, yarn.lock,
+      pnpm-lock.yaml, Cargo.lock, poetry.lock, Gemfile.lock,
+      composer.lock, go.sum, Pipfile.lock); the diff now names the
+      packages — "react 18.2.0 → 18.3.0, axios added, moment removed"
+- [x] Repo facts via `git ls-files`: line endings (lf / crlf /
+      mixed, sampled from tracked text files), executable file count,
+      symlink count
+- [x] Diff + fixes + workflow-aware filtering for all new fields;
+      full system-package inventory deliberately NOT done (too big,
+      too noisy — OS release + runner image cover the common cases)
+- [x] Tests: 34 passing (lockfile parsers for all 9 formats,
+      runtimes via stub binaries, services, git facts, lockfile
+      detail diff); demo: lockfile detail names the 3 changed
+      packages, git facts capture mixed endings + exec + symlink
+
+Exit criteria: a lockfile change now reads as "react went
+18.2.0 → 18.3.0", not "hash changed" — and a repo that only
+works on one OS / runtime is fingerprinted, not guessed.
 
 ## Phase 6 — Run the failing step locally
 

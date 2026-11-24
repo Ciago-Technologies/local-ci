@@ -32,6 +32,9 @@ type Usage struct {
 	RunsOn map[string]bool `json:"runs_on"`
 	// Services lists service images, e.g. "postgres:16".
 	Services []string `json:"services,omitempty"`
+	// ServiceImages maps a service name to its image, e.g.
+	// postgres -> "postgres:16".
+	ServiceImages map[string]string `json:"service_images,omitempty"`
 	// Files lists the workflow files that were parsed.
 	Files []string `json:"files,omitempty"`
 	// Found is false when no workflow files were found at all.
@@ -41,9 +44,10 @@ type Usage struct {
 // ParseDir reads all *.yml / *.yaml files under dir and merges them.
 func ParseDir(dir string) (*Usage, error) {
 	u := &Usage{
-		Runtimes: map[string]map[string]bool{},
-		Env:      map[string]bool{},
-		RunsOn:   map[string]bool{},
+		Runtimes:      map[string]map[string]bool{},
+		Env:           map[string]bool{},
+		RunsOn:        map[string]bool{},
+		ServiceImages: map[string]string{},
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -176,13 +180,14 @@ func parseMatrix(strategyRaw interface{}, u *Usage) {
 
 func parseServices(servicesRaw interface{}, u *Usage) {
 	services, _ := asMap(servicesRaw)
-	for _, raw := range services {
+	for name, raw := range services {
 		svc, ok := asMap(raw)
 		if !ok {
 			continue
 		}
 		if img, _ := svc["image"].(string); img != "" {
 			u.Services = append(u.Services, img)
+			u.ServiceImages[name] = img
 		}
 	}
 }

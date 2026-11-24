@@ -23,7 +23,7 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 4 — matrix + baseline freshness. Published on the GitHub Marketplace as v0.4.1.**
+> **Status: Phase 5 — fingerprint coverage. Published on the GitHub Marketplace as v0.4.1.**
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ACTION.md](docs/ACTION.md).
 
 ## Why LocalCI, not another CI runner?
@@ -107,15 +107,15 @@ Then copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your rep
 
 Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 
-## What gets fingerprinted (Phase 1)
+## What gets fingerprinted
 
-- Runtime versions: Go, Node, Python
-- OS, arch, CPU / memory
+- Runtime versions: Go, Node, Python, Rust, Java, Ruby, .NET
+- OS, arch, OS release (`ubuntu 24.04`), CPU / memory, runner image
 - Timezone, locale
-- Env var names only — never values
-- Lockfile hash (`go.sum`, `package-lock.json`, `poetry.lock`, etc.)
-- Git commit
-- File case-sensitivity
+- Env var names only — never values (opt-in values with `--include-values`)
+- Lockfile hash **plus which packages changed** (`react 18.2.0 → 18.3.0, axios added`) — package-lock, yarn, pnpm, Cargo, poetry, Gemfile, composer, go.sum, Pipfile
+- Services from the workflow (`postgres:16`), Dockerfile base image
+- Git commit, file case-sensitivity, line endings, executable files, symlinks
 
 ## Roadmap
 
@@ -124,7 +124,7 @@ Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 - **Phase 2** — GitHub Action: capture in CI, compare in PR
 - **Phase 3** — Workflow-aware diff + fix suggestions + severity (done)
 - **Phase 4** — Matrix + baseline freshness (done)
-- **Phase 5** — Fingerprint coverage (runtimes, services, lockfile detail)
+- **Phase 5** — Fingerprint coverage (runtimes, services, lockfile detail) (done)
 - **Phase 6** — Run the failing step locally in a matching container
 - **Phase 7** — Launch: demo, docs, GitLab, good-first-issues
 

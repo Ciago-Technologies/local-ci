@@ -63,6 +63,65 @@ func TestDiff_KnownMismatch(t *testing.T) {
 	}
 }
 
+func TestDiff_LockfilePackageDetail(t *testing.T) {
+	a := &Fingerprint{
+		Lockfiles: map[string]string{"package-lock.json": "aaa"},
+		LockfilePackages: map[string]map[string]string{
+			"package-lock.json": {"react": "18.2.0", "lodash": "4.17.21", "moment": "2.29.0"},
+		},
+	}
+	b := &Fingerprint{
+		Lockfiles: map[string]string{"package-lock.json": "bbb"},
+		LockfilePackages: map[string]map[string]string{
+			"package-lock.json": {"react": "18.3.0", "lodash": "4.17.21", "axios": "1.7.0"},
+		},
+	}
+	diffs := Diff(a, b)
+	if len(diffs) != 1 {
+		t.Fatalf("lockfile diffs = %v, want 1", diffs)
+	}
+	d := diffs[0]
+	for _, want := range []string{"react 18.2.0 → 18.3.0", "axios added", "moment removed"} {
+		if !containsString(d.Detail, want) {
+			t.Errorf("lockfile detail = %q, want it to contain %q", d.Detail, want)
+		}
+	}
+	if d.Severity != SeverityCritical {
+		t.Errorf("lockfile severity = %q, want critical", d.Severity)
+	}
+}
+
+func TestDiff_NewFields(t *testing.T) {
+	a := &Fingerprint{
+		OSRelease: "ubuntu 22.04", ContainerImage: "node:20-alpine",
+		LineEndings: "lf", ExecutableFiles: 3, Symlinks: 1,
+		Services: map[string]string{"postgres": "postgres:15"},
+	}
+	b := &Fingerprint{
+		OSRelease: "ubuntu 24.04", ContainerImage: "node:22-alpine",
+		LineEndings: "crlf", ExecutableFiles: 2, Symlinks: 0,
+		Services: map[string]string{"postgres": "postgres:16"},
+	}
+	diffs := Diff(a, b)
+	byField := map[string]Difference{}
+	for _, d := range diffs {
+		byField[d.Field] = d
+	}
+	for _, f := range []string{"os_release", "container_image", "line_endings", "executable_files", "symlinks", "service:postgres"} {
+		d, ok := byField[f]
+		if !ok {
+			t.Errorf("missing diff for %s: %v", f, diffs)
+			continue
+		}
+		if d.Severity != SeverityWarning {
+			t.Errorf("%s severity = %q, want warning", f, d.Severity)
+		}
+		if d.Fix == "" {
+			t.Errorf("%s has no fix", f)
+		}
+	}
+}
+
 func TestDiff_RuntimeMajorMismatchIsCritical(t *testing.T) {
 	a := &Fingerprint{Runtimes: map[string]string{"node": "20.11.0"}}
 	b := &Fingerprint{Runtimes: map[string]string{"node": "18.19.0"}}

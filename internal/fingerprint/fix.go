@@ -40,6 +40,16 @@ func Suggest(d Difference) string {
 		}
 	}
 
+	// Services.
+	if name, ok := strings.CutPrefix(field, "service:"); ok {
+		_ = name
+		img := d.B
+		if img == "(missing)" {
+			img = d.A
+		}
+		return fmt.Sprintf("Use the same image on both sides — set image: %s in the workflow services: block, or update your local setup to match.", img)
+	}
+
 	// Lockfiles.
 	if _, ok := strings.CutPrefix(field, "lockfile:"); ok {
 		return "Re-run the install step locally (npm ci / go mod tidy / pip install) and commit the updated lockfile."
@@ -54,6 +64,16 @@ func Suggest(d Difference) string {
 		return "The workflow runs on a different platform — if the code is platform-specific, test on a matching runner or in a container."
 	case "git_commit":
 		return "Compare fingerprints from the same commit — re-capture after pulling."
+	case "os_release":
+		return "The OS release differs — if the code depends on system packages, pin runs-on to a specific image (e.g. ubuntu-22.04) or match the release locally."
+	case "container_image":
+		return "Update the Dockerfile FROM line to match CI, or rebuild your local image from the same base."
+	case "line_endings":
+		return "Add a .gitattributes with '* text=auto' and normalize with `git add --renormalize .`, or set core.autocrlf the same on both sides."
+	case "executable_files":
+		return "Check `git diff --summary` for mode changes — run `chmod +x` on the right files and commit."
+	case "symlinks":
+		return "Symlinks don't survive on Windows runners — replace the symlink with the real file, or a build step that creates it."
 	case "runner_image":
 		return "GitHub updated its runner image. Pin runs-on to a specific image (e.g. ubuntu-22.04) in the workflow, then re-capture the baseline and check the other differences are real."
 	case "case_sensitive":

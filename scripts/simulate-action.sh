@@ -98,9 +98,30 @@ else
   echo "PASS: scenario matrix"
 fi
 
+# 6. Lockfile detail: the diff names the packages that changed.
+echo ""
+echo "== Scenario: lockfile detail (expect exit 1, react bump named) =="
+mkdir -p "$TMP/lockdetail"
+printf '{"packages":{"node_modules/react":{"version":"18.2.0"},"node_modules/moment":{"version":"2.29.0"}}}' > "$TMP/lockdetail/package-lock.json"
+"$TMP/localci" capture --dir "$TMP/lockdetail" -o "$TMP/lockdetail/local.json" > /dev/null 2>&1
+printf '{"packages":{"node_modules/react":{"version":"18.3.0"},"node_modules/axios":{"version":"1.7.0"}}}' > "$TMP/lockdetail/package-lock.json"
+"$TMP/localci" capture --dir "$TMP/lockdetail" -o "$TMP/lockdetail/ci.json" > /dev/null 2>&1
+"$TMP/localci" diff "$TMP/lockdetail/local.json" "$TMP/lockdetail/ci.json" > "$TMP/lockdetail/diff.txt" 2>&1
+got_exit=$?
+cat "$TMP/lockdetail/diff.txt"
+if [ "$got_exit" -ne 1 ]; then
+  echo "FAIL: scenario lockfile detail exited $got_exit, want 1"
+  fail=1
+elif ! grep -q "react 18.2.0 → 18.3.0" "$TMP/lockdetail/diff.txt" || ! grep -q "axios added" "$TMP/lockdetail/diff.txt"; then
+  echo "FAIL: scenario lockfile detail did not name the changed packages"
+  fail=1
+else
+  echo "PASS: scenario lockfile detail"
+fi
+
 echo ""
 if [ "$fail" -ne 0 ]; then
   echo "SIMULATION FAILED"
   exit 1
 fi
-echo "SIMULATION PASSED: 5/5 scenarios"
+echo "SIMULATION PASSED: 6/6 scenarios"

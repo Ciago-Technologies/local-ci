@@ -33,6 +33,9 @@ func TestParseDir(t *testing.T) {
 	if len(u.Services) != 1 || u.Services[0] != "postgres:16" {
 		t.Errorf("expected services [postgres:16], got %v", u.Services)
 	}
+	if u.ServiceImages["postgres"] != "postgres:16" {
+		t.Errorf("expected ServiceImages[postgres]=postgres:16, got %v", u.ServiceImages)
+	}
 	// Matrix + setup-node both pin 20.
 	if !u.Runtimes["node"]["20"] || !u.Runtimes["node"]["22"] {
 		t.Errorf("expected node versions {20, 22}, got %v", u.Runtimes["node"])

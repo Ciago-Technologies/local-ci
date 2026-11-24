@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Ciago-Technologies/local-ci/internal/workflow"
 )
 
 // Known lockfiles, by base name. Values are hashed, never read for content.
@@ -60,20 +62,28 @@ func CaptureWithOptions(dir string, opts CaptureOptions) (*Fingerprint, error) {
 		return nil, err
 	}
 
+	le, execs, syms := gitFacts(abs)
 	fp := &Fingerprint{
-		CapturedAt:    time.Now().UTC(),
-		OS:            runtime.GOOS,
-		Arch:          runtime.GOARCH,
-		Timezone:      time.Now().Location().String(),
-		Locale:        locale(),
-		Runtimes:      runtimes(),
-		EnvNames:      envNames(),
-		Lockfiles:     lockfiles(abs),
-		GitCommit:     gitCommit(abs),
-		CaseSensitive: caseSensitive(abs),
-		CPUCount:      runtime.NumCPU(),
-		MemoryMB:      totalMemoryMB(),
-		RunnerImage:   runnerImage(),
+		CapturedAt:       time.Now().UTC(),
+		OS:               runtime.GOOS,
+		Arch:             runtime.GOARCH,
+		Timezone:         time.Now().Location().String(),
+		Locale:           locale(),
+		Runtimes:         runtimes(),
+		EnvNames:         envNames(),
+		Lockfiles:        lockfiles(abs),
+		GitCommit:        gitCommit(abs),
+		CaseSensitive:    caseSensitive(abs),
+		CPUCount:         runtime.NumCPU(),
+		MemoryMB:         totalMemoryMB(),
+		RunnerImage:      runnerImage(),
+		OSRelease:        osRelease(),
+		Services:         servicesFromWorkflows(abs),
+		ContainerImage:   dockerfileBase(abs),
+		LineEndings:      le,
+		ExecutableFiles:  execs,
+		Symlinks:         syms,
+		LockfilePackages: lockfilePackages(abs),
 	}
 	if len(opts.IncludeValues) > 0 {
 		fp.EnvValues = map[string]string{}
@@ -132,11 +142,62 @@ func runtimes() map[string]string {
 	} else if v := commandVersion("python", "--version"); v != "" {
 		out["python"] = strings.TrimPrefix(v, "Python ")
 	}
+	// rustc --version prints "rustc 1.83.0 (.....)".
+	if v := commandVersion("rustc", "--version"); v != "" {
+		if ver := versionWord(v, "rustc"); ver != "" {
+			out["rust"] = ver
+		}
+	}
+	// java -version prints to stderr: openjdk version "17.0.9" ...
+	if v := commandVersion("java", "-version"); v != "" {
+		if ver := quotedVersion(v); ver != "" {
+			out["java"] = ver
+		}
+	}
+	// ruby --version prints "ruby 3.3.0p0 (.....) ...".
+	if v := commandVersion("ruby", "--version"); v != "" {
+		if ver := versionWord(v, "ruby"); ver != "" {
+			out["ruby"] = strings.TrimSuffix(ver, "p0")
+		}
+	}
+	// dotnet --version prints "8.0.100".
+	if v := commandVersion("dotnet", "--version"); v != "" {
+		out["dotnet"] = v
+	}
 	return out
 }
 
+// versionWord returns the word after prefix in s, e.g.
+// versionWord("rustc 1.83.0 (x)", "rustc") == "1.83.0".
+func versionWord(s, prefix string) string {
+	fields := strings.Fields(s)
+	for i, f := range fields {
+		if f == prefix && i+1 < len(fields) {
+			return fields[i+1]
+		}
+	}
+	return ""
+}
+
+// quotedVersion returns the first double-quoted string in s, e.g.
+// quotedVersion(`openjdk version "17.0.9" 2024-01-16`) == "17.0.9".
+func quotedVersion(s string) string {
+	start := strings.IndexByte(s, '"')
+	if start < 0 {
+		return ""
+	}
+	rest := s[start+1:]
+	end := strings.IndexByte(rest, '"')
+	if end < 0 {
+		return ""
+	}
+	return rest[:end]
+}
+
 // commandVersion runs name with args and returns the first line of
-// combined output, trimmed. Empty string when the command is missing
+// combined output (stdout + stderr), trimmed. Several runtimes
+// report their version on stderr (java, old python), so stdout
+// alone is not enough. Empty string when the command is missing
 // or fails — a missing runtime is not an error.
 func commandVersion(name string, args ...string) string {
 	path, err := exec.LookPath(name)
@@ -144,20 +205,185 @@ func commandVersion(name string, args ...string) string {
 		return ""
 	}
 	cmd := exec.Command(path, args...)
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// python --version writes to stderr on old versions.
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
-			out = ee.Stderr
-		} else {
-			return ""
-		}
+		return ""
 	}
 	line := strings.TrimSpace(string(out))
 	if i := strings.IndexByte(line, '\n'); i >= 0 {
 		line = line[:i]
 	}
 	return strings.TrimSpace(line)
+}
+
+// osRelease returns the OS distribution release, e.g. "ubuntu 24.04".
+// Linux reads /etc/os-release (ID + VERSION_ID); macOS uses sw_vers.
+// Empty when it cannot be determined.
+func osRelease() string {
+	switch runtime.GOOS {
+	case "linux":
+		data, err := os.ReadFile("/etc/os-release")
+		if err != nil {
+			return ""
+		}
+		var id, ver string
+		for _, line := range strings.Split(string(data), "\n") {
+			k, v, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			v = strings.Trim(v, `"`)
+			switch k {
+			case "ID":
+				id = v
+			case "VERSION_ID":
+				ver = v
+			}
+		}
+		if id == "" {
+			return ""
+		}
+		if ver != "" {
+			return id + " " + ver
+		}
+		return id
+	case "darwin":
+		name := commandVersion("sw_vers", "-productName")
+		ver := commandVersion("sw_vers", "-productVersion")
+		if name == "" {
+			return ""
+		}
+		return strings.ToLower(name) + " " + ver
+	default:
+		return ""
+	}
+}
+
+// servicesFromWorkflows reads the repo's .github/workflows services:
+// blocks and returns service name -> image, e.g. postgres ->
+// "postgres:16". It records what the workflow asks for, not a live
+// probe — a stopped local database has no version to report.
+func servicesFromWorkflows(root string) map[string]string {
+	usage, err := workflow.ParseDir(filepath.Join(root, ".github", "workflows"))
+	if err != nil || !usage.HasWorkflows() {
+		return nil
+	}
+	if len(usage.ServiceImages) == 0 {
+		return nil
+	}
+	return usage.ServiceImages
+}
+
+// dockerfileBase returns the base image from the repo's Dockerfile
+// (the first FROM line), e.g. "node:20-alpine". Empty when there
+// is no Dockerfile.
+func dockerfileBase(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(strings.ToUpper(line), "FROM ") {
+			continue
+		}
+		rest := strings.TrimSpace(line[len("FROM "):])
+		fields := strings.Fields(rest)
+		if len(fields) == 0 {
+			return ""
+		}
+		img := fields[0]
+		// FROM [--platform=...] image [AS name]
+		if strings.HasPrefix(img, "--platform=") && len(fields) > 1 {
+			img = fields[1]
+		}
+		return img
+	}
+	return ""
+}
+
+// gitFacts samples tracked files for line endings and counts
+// executable files and symlinks. It returns ("", 0, 0) when the
+// directory is not a git checkout or git is unavailable.
+func gitFacts(dir string) (lineEndings string, execFiles, symlinks int) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		return "", 0, 0
+	}
+	out, err := exec.Command(git, "-C", dir, "ls-files", "-s").Output()
+	if err != nil {
+		return "", 0, 0
+	}
+	var files []string
+	for _, line := range strings.Split(string(out), "\n") {
+		// Format: "<mode> <sha> <stage>\t<path>"
+		tab := strings.IndexByte(line, '\t')
+		if tab < 0 {
+			continue
+		}
+		mode := strings.Fields(line[:tab])
+		if len(mode) == 0 {
+			continue
+		}
+		switch mode[0] {
+		case "120000":
+			symlinks++
+		case "100755":
+			execFiles++
+		}
+		files = append(files, line[tab+1:])
+	}
+	if len(files) == 0 {
+		return "", execFiles, symlinks
+	}
+	// Sample up to 100 files, first 8 KiB each, for line endings.
+	var sawLF, sawCRLF bool
+	checked := 0
+	for _, f := range files {
+		if checked >= 100 {
+			break
+		}
+		// Skip likely-binary paths by extension.
+		ext := strings.ToLower(filepath.Ext(f))
+		switch ext {
+		case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf",
+			".zip", ".gz", ".tar", ".xz", ".woff", ".woff2", ".ttf", ".otf", ".mp3", ".mp4":
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		checked++
+		if len(data) > 8192 {
+			data = data[:8192]
+		}
+		if strings.IndexByte(string(data), 0) >= 0 {
+			continue // binary content
+		}
+		if strings.Contains(string(data), "\r\n") {
+			sawCRLF = true
+		}
+		if strings.Contains(string(data), "\n") {
+			// A lone LF: strip CRLFs first, then look for \n.
+			stripped := strings.ReplaceAll(string(data), "\r\n", "")
+			if strings.Contains(stripped, "\n") {
+				sawLF = true
+			}
+		}
+		if sawLF && sawCRLF {
+			break
+		}
+	}
+	switch {
+	case sawLF && sawCRLF:
+		lineEndings = "mixed"
+	case sawCRLF:
+		lineEndings = "crlf"
+	case sawLF:
+		lineEndings = "lf"
+	}
+	return lineEndings, execFiles, symlinks
 }
 
 func envNames() []string {

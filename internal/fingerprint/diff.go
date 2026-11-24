@@ -72,6 +72,35 @@ func Diff(a, b *Fingerprint) []Difference {
 	if a.RunnerImage != b.RunnerImage && (a.RunnerImage != "" || b.RunnerImage != "") {
 		add("runner_image", orMissing(a.RunnerImage), orMissing(b.RunnerImage), "runner image changed — the baseline may be stale", SeverityWarning)
 	}
+	if a.OSRelease != b.OSRelease && (a.OSRelease != "" || b.OSRelease != "") {
+		add("os_release", orMissing(a.OSRelease), orMissing(b.OSRelease), "OS release differs — system packages may differ too", SeverityWarning)
+	}
+	if a.ContainerImage != b.ContainerImage && (a.ContainerImage != "" || b.ContainerImage != "") {
+		add("container_image", orMissing(a.ContainerImage), orMissing(b.ContainerImage), "Dockerfile base image differs", SeverityWarning)
+	}
+	if a.LineEndings != b.LineEndings && (a.LineEndings != "" || b.LineEndings != "") {
+		add("line_endings", orMissing(a.LineEndings), orMissing(b.LineEndings), "line endings differ — check .gitattributes / core.autocrlf", SeverityWarning)
+	}
+	if a.ExecutableFiles != b.ExecutableFiles {
+		add("executable_files", strconv.Itoa(a.ExecutableFiles), strconv.Itoa(b.ExecutableFiles), "executable file count differs — a chmod may have been lost", SeverityWarning)
+	}
+	if a.Symlinks != b.Symlinks {
+		add("symlinks", strconv.Itoa(a.Symlinks), strconv.Itoa(b.Symlinks), "symlink count differs — symlinks break on Windows runners", SeverityWarning)
+	}
+
+	// Services: union of names, from the workflow's services: block.
+	for _, name := range unionKeys(a.Services, b.Services) {
+		av, aok := a.Services[name]
+		bv, bok := b.Services[name]
+		switch {
+		case !aok:
+			add("service:"+name, "(missing)", bv, "service only in CI", SeverityWarning)
+		case !bok:
+			add("service:"+name, av, "(missing)", "service only locally", SeverityWarning)
+		case av != bv:
+			add("service:"+name, av, bv, "service image differs", SeverityWarning)
+		}
+	}
 
 	// Runtimes: union of names.
 	for _, name := range unionKeys(a.Runtimes, b.Runtimes) {
@@ -116,6 +145,8 @@ func Diff(a, b *Fingerprint) []Difference {
 	}
 
 	// Lockfiles: union of paths, compare hashes (first 12 chars in output).
+	// When both sides recorded package versions, the detail names
+	// the packages that changed instead of just saying "hash changed".
 	for _, p := range unionKeys(a.Lockfiles, b.Lockfiles) {
 		av, aok := a.Lockfiles[p]
 		bv, bok := b.Lockfiles[p]
@@ -125,7 +156,11 @@ func Diff(a, b *Fingerprint) []Difference {
 		case !bok:
 			add("lockfile:"+p, shortHash(av), "(missing)", "missing in CI", SeverityCritical)
 		case av != bv:
-			add("lockfile:"+p, shortHash(av), shortHash(bv), "lockfile changed — run the package manager install step again", SeverityCritical)
+			detail := "lockfile changed — run the package manager install step again"
+			if changes := lockfilePackageChanges(a.LockfilePackages[p], b.LockfilePackages[p]); len(changes) > 0 {
+				detail = "lockfile changed: " + strings.Join(changes, ", ")
+			}
+			add("lockfile:"+p, shortHash(av), shortHash(bv), detail, SeverityCritical)
 		}
 	}
 
@@ -201,8 +236,14 @@ func workflowUses(d Difference, usage WorkflowUsage) bool {
 		return true
 	case strings.HasPrefix(d.Field, "lockfile:"):
 		return true
-	case d.Field == "git_commit" || d.Field == "case_sensitive":
+	case strings.HasPrefix(d.Field, "service:"):
 		return true
+	case d.Field == "git_commit" || d.Field == "case_sensitive" ||
+		d.Field == "container_image" || d.Field == "line_endings" ||
+		d.Field == "executable_files" || d.Field == "symlinks":
+		return true
+	case d.Field == "os_release":
+		return !osReleaseMatches(usage.RunsOnLabels(), d.B)
 	case d.Field == "timezone":
 		return usage.UsedEnv("TZ") || usage.UsedEnv("TIMEZONE")
 	case d.Field == "locale":
@@ -211,6 +252,24 @@ func workflowUses(d Difference, usage WorkflowUsage) bool {
 		return !runsOnMatches(usage.RunsOnLabels(), d.B)
 	}
 	return true
+}
+
+// osReleaseMatches reports whether a runs-on label implies the
+// given OS release string (the CI side), e.g. "ubuntu 24.04"
+// matches "ubuntu-latest", "macos 15.1" matches "macos-latest".
+// A macOS laptop vs an Ubuntu runner is expected, not a finding.
+func osReleaseMatches(labels []string, osRelease string) bool {
+	fields := strings.Fields(strings.ToLower(osRelease))
+	if len(fields) == 0 {
+		return false
+	}
+	distro := fields[0]
+	for _, label := range labels {
+		if strings.Contains(strings.ToLower(label), distro) {
+			return true
+		}
+	}
+	return false
 }
 
 // runsOnMatches reports whether a runs-on label implies the given
@@ -270,6 +329,33 @@ func contains(list []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// lockfilePackageChanges describes which packages changed between
+// two versions of one lockfile, e.g. ["react 18.2.0 → 18.3.0",
+// "lodash added", "moment removed"]. At most 5 entries, plus a
+// "+N more" tail. Empty when there is nothing to compare.
+func lockfilePackageChanges(a, b map[string]string) []string {
+	if len(a) == 0 || len(b) == 0 {
+		return nil
+	}
+	var changes []string
+	for _, name := range unionKeys(a, b) {
+		av, aok := a[name]
+		bv, bok := b[name]
+		switch {
+		case !aok:
+			changes = append(changes, name+" added ("+bv+")")
+		case !bok:
+			changes = append(changes, name+" removed")
+		case av != bv:
+			changes = append(changes, name+" "+av+" → "+bv)
+		}
+	}
+	if len(changes) > 5 {
+		changes = append(changes[:5], fmt.Sprintf("+%d more", len(changes)-5))
+	}
+	return changes
 }
 
 func orMissing(s string) string {
