@@ -23,8 +23,8 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 1 — MVP `capture` + `diff` works.**
-> See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: Phase 2 — GitHub Action works.**
+> See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ACTION.md](docs/ACTION.md).
 
 ## Why LocalCI, not another CI runner?
 
@@ -75,6 +75,19 @@ Found 4 difference(s) — local vs CI:
 ```
 
 CPU and memory differences are reported with `[info]` — a laptop and a CI runner rarely have the same hardware, so they don't count as a likely cause on their own.
+
+## GitHub Action
+
+On every PR, capture in CI and compare with a baseline committed from your laptop:
+
+```bash
+localci capture -o .localci/local.json
+git add .localci/local.json && git commit -m "Add LocalCI baseline"
+```
+
+Then copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your repo. The action diffs CI against the baseline, comments the diff on the PR, uploads both fingerprints as artifacts, and fails the check when they differ.
+
+Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 
 ## What gets fingerprinted (Phase 1)
 
