@@ -12,13 +12,14 @@ Vision: **Find out locally why CI will fail — before you push.**
 
 Exit criteria: repo is live, `go build ./...` passes in CI, scope is locked.
 
-## Phase 1 — MVP `capture` + `diff`
+## Phase 1 — MVP `capture` + `diff` (done 2026-11-24)
 
-- `localci capture` writes a JSON fingerprint to stdout / file
-- Collect: Go / Node / Python versions, OS + arch, timezone, locale, CPU / memory, env names, lockfile hashes, git commit, case-sensitivity
-- `localci diff a.json b.json` prints a human-readable diff, exit 1 on differences
-- `--json` output for scripting
-- Tested on Linux + macOS, with fixtures for a known mismatch (e.g. Node 20.11 vs 20.9)
+- [x] `localci capture` writes a JSON fingerprint to stdout / file (`-o`, `--dir`)
+- [x] Collect: Go / Node / Python versions, OS + arch, timezone, locale, CPU / memory, env names, lockfile hashes, git commit, case-sensitivity
+- [x] `localci diff a.json b.json` prints a human-readable diff, exit 1 on differences, 0 on match
+- [x] `--json` output for scripting; hardware differences marked `severity: info`
+- [x] Tests: 6 passing, incl. fixtures for a known mismatch (Node 20.11 vs 20.9, Asia/Kolkata vs UTC, missing STRIPE_KEY, lockfile drift) and a no-secrets test
+- [ ] Tested on macOS (Linux verified; macOS still to do)
 
 Exit criteria: a real "passes locally, fails in CI" case is diagnosed in under a minute with a copy-pasteable diff.
 
