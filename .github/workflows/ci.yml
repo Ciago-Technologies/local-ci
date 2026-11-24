@@ -19,3 +19,35 @@ jobs:
       - run: go build -o localci .
       - run: ./localci --help
       - run: ./localci --version
+
+  # Live test for `localci run` (Phase 6): runs a real command in a
+  # real Docker container on the GitHub runner. The Muse VM cannot
+  # run containers (no cgroup controllers), so this job is the only
+  # place Phase 6 is exercised end to end.
+  live-run:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - run: go build -o localci .
+      - name: live run — passing command in the CI-matching container
+        run: |
+          printf '#!/bin/sh\necho "hello from $(grep PRETTY_NAME /etc/os-release)"\n' > live-pass.sh
+          chmod +x live-pass.sh
+          ./localci run -- ./live-pass.sh
+      - name: live run — env opt-in reaches the container
+        run: ./localci run --env GREETING=hello-from-ci -- sh -c 'test "$GREETING" = hello-from-ci'
+      - name: live run — exit code passthrough (want 3)
+        run: |
+          printf '#!/bin/sh\nexit 3\n' > live-fail.sh
+          chmod +x live-fail.sh
+          set +e
+          ./localci run -- ./live-fail.sh
+          code=$?
+          if [ "$code" -ne 3 ]; then echo "want exit 3, got $code"; exit 1; fi
+          echo "exit code passthrough OK (3)"
+      - name: live run — workflow step resolves its image
+        run: ./localci run --dry-run --workflow internal/workflow/testdata/run.yml --job test --step Test
