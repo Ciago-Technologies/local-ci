@@ -63,13 +63,30 @@ CPU) the same way as a missing secret. Phase 3 fixes that:
 Exit criteria: a diff now reads as "this job will fail because X",
 with a fix — not "here are 7 differences, good luck".
 
-## Phase 4 — Matrix + baseline freshness
+## Phase 4 — Matrix + baseline freshness (done 2026-11-24)
 
-- Multiple baselines (one per OS / runtime matrix entry), picked by
-  the workflow's `strategy.matrix`
-- Fingerprint the runner image version; warn when the baseline is
-  older than the runner image
-- Baseline staleness warning (e.g. baseline older than 30 days)
+- [x] Multiple baselines: `localci diff --baseline-dir .localci ci.json`
+      picks the baseline matching the CI fingerprint (OS, arch,
+      runtime major versions) — one baseline per matrix cell
+      (`.localci/ubuntu-node20.json`, `.localci/macos-node22.json`)
+- [x] Runner image fingerprinted: `runner_image` from the
+      `ImageOS` / `ImageVersion` env vars on GitHub-hosted runners;
+      a change is a warning diff with a fix (pin `runs-on`)
+- [x] Baseline staleness: `diff` warns when the baseline is older
+      than 30 days (`BaselineMaxAgeDays`); a stale baseline is a
+      warning, not a difference
+- [x] Action: new `baseline-dir` input; matrix example in
+      `examples/pr-check-matrix.yml`; `branding` added for the
+      GitHub Marketplace listing
+- [x] Tests: 17 passing (baseline pick, no-match error, staleness,
+      runner image); demo: correct cell picked, 40-day-old baseline
+      warns, runner image change shows as a warning diff
+- [ ] Publish to the GitHub Marketplace as release v0.4.0 (repo is
+      public; use the "Draft a release" banner, tag v0.4.0)
+
+Exit criteria: a matrix build (Ubuntu + macOS, Node 20 + 22) compares
+each cell against its own baseline, and a stale baseline or a new
+runner image is flagged instead of silently passing.
 
 ## Phase 5 — Fingerprint coverage
 

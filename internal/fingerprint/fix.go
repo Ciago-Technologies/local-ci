@@ -54,6 +54,8 @@ func Suggest(d Difference) string {
 		return "The workflow runs on a different platform — if the code is platform-specific, test on a matching runner or in a container."
 	case "git_commit":
 		return "Compare fingerprints from the same commit — re-capture after pulling."
+	case "runner_image":
+		return "GitHub updated its runner image. Pin runs-on to a specific image (e.g. ubuntu-22.04) in the workflow, then re-capture the baseline and check the other differences are real."
 	case "case_sensitive":
 		return "Rename the file so its case matches on both sides; check `git ls-files` for names differing only by case."
 	case "cpu_count", "memory_mb":

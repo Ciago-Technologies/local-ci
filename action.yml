@@ -26,6 +26,9 @@
 name: LocalCI
 description: Find out in CI why it differs from local — before you merge.
 author: Ciago Technologies
+branding:
+  icon: terminal
+  color: blue
 
 inputs:
   local-fingerprint:
@@ -44,6 +47,10 @@ inputs:
     description: Workflow directory to read for workflow-aware diffing. Set to '' to disable.
     required: false
     default: .github/workflows
+  baseline-dir:
+    description: Directory of baseline fingerprints (.localci). When set, the action picks the baseline that best matches this runner (matrix support) instead of using local-fingerprint.
+    required: false
+    default: ''
 
 outputs:
   has-differences:
@@ -78,21 +85,36 @@ runs:
       run: |
         LOCALCI="${{ runner.temp }}/localci"
         BASELINE="${{ inputs.local-fingerprint }}"
-        if [ ! -f "$BASELINE" ]; then
-          echo "No baseline fingerprint at $BASELINE."
-          echo "Run 'localci capture -o $BASELINE' on your laptop and commit it."
-          echo "has-differences=false" >> "$GITHUB_OUTPUT"
-          echo "diff=" >> "$GITHUB_OUTPUT"
-          printf '# LocalCI\n\nNo baseline fingerprint found at `%s`.\n\nRun `localci capture -o %s` on your laptop and commit it, then re-run this check.\n' "$BASELINE" "$BASELINE" > localci-diff.md
-          exit 0
-        fi
-        set +e
+        BASELINE_DIR="${{ inputs.baseline-dir }}"
         DIFF_ARGS=()
         if [ -n "${{ inputs.workflows-dir }}" ] && [ -d "${{ inputs.workflows-dir }}" ]; then
           DIFF_ARGS+=(--workflows "${{ inputs.workflows-dir }}")
         fi
-        "$LOCALCI" diff "${DIFF_ARGS[@]}" "$BASELINE" ci.json > localci-diff.txt 2>&1
-        DIFF_EXIT=$?
+        set +e
+        if [ -n "$BASELINE_DIR" ]; then
+          # Matrix mode: pick the baseline matching this runner.
+          "$LOCALCI" diff "${DIFF_ARGS[@]}" --baseline-dir "$BASELINE_DIR" ci.json > localci-diff.txt 2>&1
+          DIFF_EXIT=$?
+          if [ "$DIFF_EXIT" -eq 2 ]; then
+            echo "No baseline in $BASELINE_DIR matches this runner."
+            echo "Run 'localci capture -o $BASELINE_DIR/<os>-<runtime><version>.json' on a matching machine and commit it."
+            echo "has-differences=false" >> "$GITHUB_OUTPUT"
+            echo "diff=" >> "$GITHUB_OUTPUT"
+            printf '# LocalCI\n\nNo baseline in `%s` matches this runner.\n\nRun `localci capture -o %s/<os>-<runtime><version>.json` on a matching machine and commit it, then re-run this check.\n' "$BASELINE_DIR" "$BASELINE_DIR" > localci-diff.md
+            exit 0
+          fi
+        else
+          if [ ! -f "$BASELINE" ]; then
+            echo "No baseline fingerprint at $BASELINE."
+            echo "Run 'localci capture -o $BASELINE' on your laptop and commit it."
+            echo "has-differences=false" >> "$GITHUB_OUTPUT"
+            echo "diff=" >> "$GITHUB_OUTPUT"
+            printf '# LocalCI\n\nNo baseline fingerprint found at `%s`.\n\nRun `localci capture -o %s` on your laptop and commit it, then re-run this check.\n' "$BASELINE" "$BASELINE" > localci-diff.md
+            exit 0
+          fi
+          "$LOCALCI" diff "${DIFF_ARGS[@]}" "$BASELINE" ci.json > localci-diff.txt 2>&1
+          DIFF_EXIT=$?
+        fi
         set -e
         {
           echo "diff<<LOCALCI_DIFF_EOF"

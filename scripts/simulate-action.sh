@@ -79,9 +79,28 @@ else
   echo "PASS: scenario workflow-aware"
 fi
 
+# 5. Matrix: --baseline-dir picks the baseline matching the CI env.
+echo ""
+echo "== Scenario: matrix baseline pick (expect exit 1, picked ubuntu-node20) =="
+mkdir -p "$TMP/matrix"
+cp "$FIX/ci.json" "$TMP/matrix/ci.json"
+"$TMP/localci" diff --baseline-dir "$ROOT/internal/fingerprint/testdata/baselines" \
+  "$TMP/matrix/ci.json" > "$TMP/matrix/diff.txt" 2>&1
+got_exit=$?
+cat "$TMP/matrix/diff.txt"
+if [ "$got_exit" -ne 1 ]; then
+  echo "FAIL: scenario matrix exited $got_exit, want 1"
+  fail=1
+elif ! grep -q "Baseline: .*/ubuntu-node20.json" "$TMP/matrix/diff.txt"; then
+  echo "FAIL: scenario matrix did not pick ubuntu-node20.json"
+  fail=1
+else
+  echo "PASS: scenario matrix"
+fi
+
 echo ""
 if [ "$fail" -ne 0 ]; then
   echo "SIMULATION FAILED"
   exit 1
 fi
-echo "SIMULATION PASSED: 4/4 scenarios"
+echo "SIMULATION PASSED: 5/5 scenarios"

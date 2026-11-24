@@ -23,7 +23,7 @@ Lockfile: local a1b2c3, CI d4e5f6
 
 No secrets. LocalCI only records env var **names**, never values.
 
-> **Status: Phase 3 — workflow-aware diff + fixes.**
+> **Status: Phase 4 — matrix + baseline freshness.**
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ACTION.md](docs/ACTION.md).
 
 ## Why LocalCI, not another CI runner?
@@ -103,6 +103,8 @@ git add .localci/local.json && git commit -m "Add LocalCI baseline"
 
 Then copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your repo. The action diffs CI against the baseline, comments the diff on the PR, uploads both fingerprints as artifacts, and fails the check when they differ.
 
+**Matrix builds:** capture one baseline per cell (`.localci/ubuntu-node20.json`, `.localci/macos-node22.json`, …) and use `baseline-dir: .localci` — the action picks the baseline matching each runner. See `examples/pr-check-matrix.yml`. The diff also warns when the baseline is older than 30 days, and when GitHub's runner image changed.
+
 Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 
 ## What gets fingerprinted (Phase 1)
@@ -121,7 +123,7 @@ Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 - **Phase 1** — MVP `capture` + `diff` CLI
 - **Phase 2** — GitHub Action: capture in CI, compare in PR
 - **Phase 3** — Workflow-aware diff + fix suggestions + severity (done)
-- **Phase 4** — Matrix + baseline freshness
+- **Phase 4** — Matrix + baseline freshness (done)
 - **Phase 5** — Fingerprint coverage (runtimes, services, lockfile detail)
 - **Phase 6** — Run the failing step locally in a matching container
 - **Phase 7** — Launch: demo, docs, GitLab, good-first-issues

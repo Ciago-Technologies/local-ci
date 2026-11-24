@@ -35,6 +35,7 @@ Copy `examples/pr-check.yml` to `.github/workflows/localci.yml` in your repo, pu
 | `fail-on-diff` | `'true'` | Fail the check when differences are found |
 | `comment-on-pr` | `'true'` | Comment the diff on the pull request |
 | `workflows-dir` | `.github/workflows` | Workflow directory for workflow-aware diffing; set to `''` to show all differences |
+| `baseline-dir` | `''` | Directory of baselines (`.localci`); when set, picks the baseline matching this runner (matrix support) instead of `local-fingerprint` |
 
 ## Outputs
 
@@ -63,13 +64,40 @@ git commit -m "Update LocalCI baseline"
 
 If you don't, the next PR will (correctly) flag the change.
 
+**Staleness:** `diff` warns when the baseline is older than 30 days.
+A stale baseline is a warning, not a failure — but re-capture it,
+because GitHub updates runner images regularly and old baselines
+go stale even when nothing in the repo changed. A runner image
+change shows up as a `runner_image` warning in the diff; pin
+`runs-on` to a specific image (e.g. `ubuntu-22.04`) if you want
+the image frozen.
+
+## Matrix builds
+
+One baseline can't cover Ubuntu + macOS, Node 20 + 22. Capture one
+baseline per matrix cell and commit them all under `.localci/`:
+
+```bash
+localci capture -o .localci/ubuntu-node20.json
+localci capture -o .localci/ubuntu-node22.json
+localci capture -o .localci/macos-node20.json
+git add .localci && git commit -m "Add LocalCI baselines"
+```
+
+Then use `baseline-dir` (see `examples/pr-check-matrix.yml`).
+The action picks the baseline matching each runner — same OS and
+arch, same runtime major versions. Matching is by fingerprint
+content, not by file name, so any naming convention works. A cell
+with no matching baseline warns and passes, like a missing baseline.
+
 ## FAQ
 
 **Do I need a release of localci first?**
 No. The action builds `localci` from source with Go 1.23, so it works from `main` / a tag / a branch.
 
 **Which version should I pin?**
-`Ciago-Technologies/local-ci@v1` once v1 is tagged. Until then, pin a commit SHA or a branch for stability.
+`Ciago-Technologies/local-ci@v0.4.0` — the first Marketplace release.
+`@v1` comes at launch, once the API is stable.
 
 **Does it work on forks?**
 The diff and artifacts work on forks. The PR comment can fail on forks (GitHub token permissions) — the action logs a warning and continues; the diff is still in the job log.

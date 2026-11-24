@@ -1,0 +1,40 @@
+# LocalCI check for a matrix build — copy this file to
+# .github/workflows/localci.yml in your repo.
+#
+# Each matrix cell gets its own baseline in .localci/, e.g.:
+#   localci capture -o .localci/ubuntu-node20.json   # on an Ubuntu laptop / container
+#   localci capture -o .localci/macos-node22.json    # on a Mac
+#   git add .localci && git commit -m "Add LocalCI baselines"
+#
+# The action picks the baseline matching each runner (OS, arch,
+# runtime major version) — no templating needed. Any naming
+# convention works; matching is by fingerprint content, not name.
+#
+# If a cell has no matching baseline, that cell warns and passes
+# instead of failing — same as a missing baseline in the basic setup.
+name: LocalCI (matrix)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  localci:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [20, 22]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - uses: Ciago-Technologies/local-ci@v0.4.0
+        with:
+          baseline-dir: .localci

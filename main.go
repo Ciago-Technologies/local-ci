@@ -21,7 +21,7 @@ import (
 	"github.com/Ciago-Technologies/local-ci/internal/workflow"
 )
 
-const version = "0.3.0-phase3"
+const version = "0.4.0-phase4"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -61,6 +61,12 @@ Usage:
                                   differences are found, 0 when they match.
                                   --workflows hides differences in things
                                   no workflow job uses (false positives).
+  localci diff [--json] [--baseline-dir DIR] <ci.json>
+                                  Pick the baseline from DIR that best
+                                  matches the CI fingerprint (matrix
+                                  support: one baseline per OS/runtime
+                                  cell), then compare. Warns when the
+                                  baseline is older than 30 days.
 
 No secrets: LocalCI records env var names only, never values,
 unless you explicitly opt in with --include-values.
@@ -113,22 +119,52 @@ func runDiff(args []string) int {
 	asJSON := fs.Bool("json", false, "print differences as JSON")
 	workflowsDir := fs.String("workflows", "", "workflow directory (e.g. .github/workflows) — hide differences in things no job uses")
 	showUnused := fs.Bool("show-unused", false, "with --workflows, show the hidden differences too")
+	baselineDir := fs.String("baseline-dir", "", "pick the baseline from DIR that best matches the CI fingerprint (matrix support); takes one positional arg, the CI fingerprint")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if fs.NArg() != 2 {
-		fmt.Fprintln(os.Stderr, "localci diff: usage: localci diff [--json] [--workflows DIR] <a.json> <b.json>")
-		return 2
+
+	var a, b *fingerprint.Fingerprint
+	var pickedBaseline string
+	var err error
+	if *baselineDir != "" {
+		if fs.NArg() != 1 {
+			fmt.Fprintln(os.Stderr, "localci diff: usage: localci diff --baseline-dir DIR <ci.json>")
+			return 2
+		}
+		b, err = loadFingerprint(fs.Arg(0))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
+			return 2
+		}
+		pickedBaseline, a, err = fingerprint.PickBaseline(*baselineDir, b)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
+			return 2
+		}
+		if !*asJSON {
+			fmt.Fprintf(os.Stderr, "Baseline: %s\n", pickedBaseline)
+		}
+	} else {
+		if fs.NArg() != 2 {
+			fmt.Fprintln(os.Stderr, "localci diff: usage: localci diff [--json] [--workflows DIR] <a.json> <b.json>")
+			return 2
+		}
+		a, err = loadFingerprint(fs.Arg(0))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
+			return 2
+		}
+		b, err = loadFingerprint(fs.Arg(1))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
+			return 2
+		}
 	}
-	a, err := loadFingerprint(fs.Arg(0))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
-		return 2
-	}
-	b, err := loadFingerprint(fs.Arg(1))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
-		return 2
+
+	// Baseline staleness is a warning, not a difference.
+	if w := fingerprint.StalenessWarning(a, fingerprint.BaselineMaxAgeDays); w != "" {
+		fmt.Fprintln(os.Stderr, w)
 	}
 
 	diffs := fingerprint.Diff(a, b)

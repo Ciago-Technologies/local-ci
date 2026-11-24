@@ -73,6 +73,7 @@ func CaptureWithOptions(dir string, opts CaptureOptions) (*Fingerprint, error) {
 		CaseSensitive: caseSensitive(abs),
 		CPUCount:      runtime.NumCPU(),
 		MemoryMB:      totalMemoryMB(),
+		RunnerImage:   runnerImage(),
 	}
 	if len(opts.IncludeValues) > 0 {
 		fp.EnvValues = map[string]string{}
@@ -90,6 +91,21 @@ func CaptureWithOptions(dir string, opts CaptureOptions) (*Fingerprint, error) {
 		}
 	}
 	return fp, nil
+}
+
+// runnerImage reads the CI runner image from the environment.
+// GitHub-hosted runners set ImageOS (e.g. "ubuntu24") and
+// ImageVersion (e.g. "20251123.1"). Empty on a laptop or on
+// self-hosted runners that don't set these vars.
+func runnerImage() string {
+	imageOS := os.Getenv("ImageOS")
+	if imageOS == "" {
+		return ""
+	}
+	if v := os.Getenv("ImageVersion"); v != "" {
+		return imageOS + "/" + v
+	}
+	return imageOS
 }
 
 func locale() string {

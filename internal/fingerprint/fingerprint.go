@@ -49,4 +49,11 @@ type Fingerprint struct {
 	CPUCount int `json:"cpu_count,omitempty"`
 	// MemoryMB is total system memory in MiB, 0 when it cannot be determined.
 	MemoryMB int64 `json:"memory_mb,omitempty"`
+
+	// RunnerImage is the CI runner image, e.g. "ubuntu24/20251123.1".
+	// GitHub-hosted runners expose it via the ImageOS / ImageVersion
+	// env vars; on a laptop it is empty. GitHub updates runner images
+	// regularly — when it changes, the baseline goes stale even if
+	// nothing in the repo changed.
+	RunnerImage string `json:"runner_image,omitempty"`
 }

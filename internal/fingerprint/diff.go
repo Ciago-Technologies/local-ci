@@ -69,6 +69,9 @@ func Diff(a, b *Fingerprint) []Difference {
 	if a.MemoryMB != b.MemoryMB && a.MemoryMB != 0 && b.MemoryMB != 0 {
 		add("memory_mb", strconv.FormatInt(a.MemoryMB, 10), strconv.FormatInt(b.MemoryMB, 10), "hardware differs — usually harmless", SeverityInfo)
 	}
+	if a.RunnerImage != b.RunnerImage && (a.RunnerImage != "" || b.RunnerImage != "") {
+		add("runner_image", orMissing(a.RunnerImage), orMissing(b.RunnerImage), "runner image changed — the baseline may be stale", SeverityWarning)
+	}
 
 	// Runtimes: union of names.
 	for _, name := range unionKeys(a.Runtimes, b.Runtimes) {
@@ -267,6 +270,13 @@ func contains(list []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func orMissing(s string) string {
+	if s == "" {
+		return "(missing)"
+	}
+	return s
 }
 
 func shortSHA(s string) string {
