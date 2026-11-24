@@ -138,7 +138,7 @@ Exit criteria: a failing `npm test` step can be reproduced locally in
 the matching container with one command — and a machine without Docker
 gets a clear error, not a silent failure.
 
-## Phase 7 — Launch (done, v0.7.0-phase7)
+## Phase 7 — Launch (done, v0.7.0)
 
 - Dogfood the Action on real repos: `examples/dogfood.yml` — copy to
   `.github/workflows/localci.yml` via the web UI to run LocalCI on
@@ -157,10 +157,12 @@ gets a clear error, not a silent failure.
   files them from these drafts.
 - Repo's own CI verified green: latest run (Phase 6, 11a8bb44)
   completed with conclusion `success` via the GitHub API.
-- Still open: live `localci run` in a real container (no Docker on
-  the build machine — Docker install via apt stalled on slow package
-  lists and was abandoned); a v0.6.0/v0.7.0 release to update the
-  Marketplace listing past v0.4.1; submitting to awesome lists.
+- Still open: live `localci run` in a real container — the Muse VM
+  cannot run containers (no cgroup controllers: runc fails on setns,
+  crun fails on the missing `io` controller), so it is tested by the
+  `live-run` job in CI instead; submitting to awesome lists.
+  v0.6.0 is released to the Marketplace; v0.7.0 follows with the
+  Phase 7 docs/demo/GitLab.
 
 Exit criteria: someone who has never seen LocalCI can install it,
 run the demo, and understand the point in 30 seconds — and the
