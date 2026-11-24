@@ -157,12 +157,38 @@ gets a clear error, not a silent failure.
   files them from these drafts.
 - Repo's own CI verified green: latest run (Phase 6, 11a8bb44)
   completed with conclusion `success` via the GitHub API.
-- Still open: live `localci run` in a real container — the Muse VM
-  cannot run containers (no cgroup controllers: runc fails on setns,
-  crun fails on the missing `io` controller), so it is tested by the
-  `live-run` job in CI instead; submitting to awesome lists.
-  v0.6.0 is released to the Marketplace; v0.7.0 follows with the
-  Phase 7 docs/demo/GitLab.
+- Still open: submitting to awesome lists.
+
+## v0.7.1 — Dogfood fixes (done)
+
+Dogfooding the Action on its own repo (PR #1, PR #2) exposed three
+real defects, all fixed here:
+
+- `gh pr comment` ran without `GH_TOKEN`, so the PR comment was
+  never posted (the `|| echo` fallback swallowed the error). The
+  Action now sets `GH_TOKEN: ${{ github.token }}` on the comment step.
+- The diff was never printed to the job log — only to the artifact —
+  while the fail message said "see the diff above". The diff step
+  now cats `localci-diff.txt`.
+- `git_commit` was compared, which would fail every PR on the
+  commit alone (a baseline's commit always differs from the PR
+  head). New `localci diff --ignore` flag; the Action passes
+  `--ignore git_commit`. Tests: 44 passing, simulation 8/8.
+
+## v0.7.2 — Dogfood fix, part 2 (done)
+
+v0.7.1 fixed the token but the comment still didn't post: `gh pr
+comment` failed with `GraphQL: Resource not accessible by
+integration (addComment)`. Root cause was in our own repo, not the
+Action: the dogfood workflow (`.github/workflows/localci.yml`,
+copied from `examples/dogfood.yml`) declared no `permissions:`,
+while the other examples did — so its token was read-only for pull
+requests. Fixed by adding `permissions: contents: read,
+pull-requests: write` to `examples/dogfood.yml` and documenting
+that the calling workflow must declare it. Also made the comment
+step's fallback emit a `::warning::` annotation instead of a plain
+echo, so a failed comment is visible in the run UI rather than
+silently swallowed.
 
 Exit criteria: someone who has never seen LocalCI can install it,
 run the demo, and understand the point in 30 seconds — and the

@@ -201,6 +201,39 @@ func TestApplyWorkflow_NoWorkflowsShowsAll(t *testing.T) {
 	}
 }
 
+func TestIgnoreFields_GitCommit(t *testing.T) {
+	// Dogfood: a baseline's commit always differs from the PR head,
+	// so the Action ignores git_commit — otherwise every PR fails
+	// on the commit alone.
+	local := loadFixture(t, "local.json")
+	ci := loadFixture(t, "ci.json")
+	// Give the two sides different commits.
+	ci.GitCommit = "different00000000000000000000000000000000"
+	diffs := Diff(local, ci)
+	found := false
+	for _, d := range diffs {
+		if d.Field == "git_commit" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("want a git_commit diff before ignoring")
+	}
+	kept := IgnoreFields(diffs, []string{"git_commit"})
+	for _, d := range kept {
+		if d.Field == "git_commit" {
+			t.Error("git_commit diff survived --ignore")
+		}
+	}
+	if len(kept) != len(diffs)-1 {
+		t.Errorf("IgnoreFields kept %d diffs, want %d", len(kept), len(diffs)-1)
+	}
+	// Empty ignore list changes nothing.
+	if got := IgnoreFields(diffs, nil); len(got) != len(diffs) {
+		t.Errorf("empty ignore changed the diffs")
+	}
+}
+
 func TestDiff_Identical(t *testing.T) {
 	local := loadFixture(t, "local.json")
 	// Compare a fingerprint with itself: no differences.

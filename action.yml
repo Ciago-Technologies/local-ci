@@ -93,7 +93,10 @@ runs:
         set +e
         if [ -n "$BASELINE_DIR" ]; then
           # Matrix mode: pick the baseline matching this runner.
-          "$LOCALCI" diff "${DIFF_ARGS[@]}" --baseline-dir "$BASELINE_DIR" ci.json > localci-diff.txt 2>&1
+          # --ignore git_commit: a baseline's commit always differs
+          # from the PR head, so it is noise in CI (dogfood caught
+          # this — every PR would fail on the commit alone).
+          "$LOCALCI" diff "${DIFF_ARGS[@]}" --ignore git_commit --baseline-dir "$BASELINE_DIR" ci.json > localci-diff.txt 2>&1
           DIFF_EXIT=$?
           if [ "$DIFF_EXIT" -eq 2 ]; then
             echo "No baseline in $BASELINE_DIR matches this runner."
@@ -112,10 +115,14 @@ runs:
             printf '# LocalCI\n\nNo baseline fingerprint found at `%s`.\n\nRun `localci capture -o %s` on your laptop and commit it, then re-run this check.\n' "$BASELINE" "$BASELINE" > localci-diff.md
             exit 0
           fi
-          "$LOCALCI" diff "${DIFF_ARGS[@]}" "$BASELINE" ci.json > localci-diff.txt 2>&1
+          "$LOCALCI" diff "${DIFF_ARGS[@]}" --ignore git_commit "$BASELINE" ci.json > localci-diff.txt 2>&1
           DIFF_EXIT=$?
         fi
         set -e
+        # Print the diff to the job log too — the fail step says
+        # "see the diff above", and until now there was nothing
+        # above (the diff only lived in the artifact).
+        cat localci-diff.txt
         {
           echo "diff<<LOCALCI_DIFF_EOF"
           cat localci-diff.txt
@@ -146,8 +153,18 @@ runs:
     - name: Comment diff on PR
       if: github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && steps.diff.outputs.has-differences == 'true'
       shell: bash
+      # gh needs GH_TOKEN in Actions — without it the comment fails
+      # with "set the GH_TOKEN environment variable" and the ||
+      # fallback swallows the error (dogfood caught this: no comment
+      # was ever posted on PR #2).
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        gh pr comment "${{ github.event.pull_request.number }}" --body-file localci-diff.md || echo "Could not post PR comment (forks and permissions can block this); the diff is in the job log and artifacts."
+        # The fallback keeps fork PRs green (their token is read-only
+        # and cannot comment), but the failure must be visible: the
+        # plain echo used to hide it, and two dogfood runs silently
+        # posted nothing. A warning annotation shows up in the run UI.
+        gh pr comment "${{ github.event.pull_request.number }}" --body-file localci-diff.md || echo "::warning::Could not post PR comment (forks and permissions can block this); the diff is in the job log and artifacts."
 
     - name: Fail on differences
       if: steps.diff.outputs.has-differences == 'true' && inputs.fail-on-diff == 'true'

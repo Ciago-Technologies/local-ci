@@ -98,14 +98,34 @@ with no matching baseline warns and passes, like a missing baseline.
 No. The action builds `localci` from source with Go 1.23, so it works from `main` / a tag / a branch.
 
 **Which version should I pin?**
-`Ciago-Technologies/local-ci@v0.7.0` — the current Marketplace release.
+`Ciago-Technologies/local-ci@v0.7.2` — the current Marketplace release.
 `@v1` comes at launch, once the API is stable.
 
 **Does it work on forks?**
 The diff and artifacts work on forks. The PR comment can fail on forks (GitHub token permissions) — the action logs a warning and continues; the diff is still in the job log.
 
+**Why doesn't the check fail on the git commit?**
+A baseline is an environment snapshot, not a commit pointer: its
+commit always differs from the PR head. The action runs the diff
+with `--ignore git_commit`, so a PR fails only on environment
+differences. Standalone `localci diff` still reports the commit
+unless you pass `--ignore git_commit` yourself.
+
+**Dogfood findings (v0.7.0 → v0.7.1):** the repo's own PR #2
+exposed three gaps, all fixed in v0.7.1: the comment step called
+`gh` without `GH_TOKEN` set, so no comment was ever posted (the
+fallback swallowed the error); the diff was never printed to the
+job log, only to the artifact; and `git_commit` was compared, which
+would have failed every PR on the commit alone.
+
 **What permissions does the workflow need?**
-`contents: read` and `pull-requests: write` (for the comment). See `examples/pr-check.yml`.
+`contents: read` and `pull-requests: write` (for the comment). See `examples/pr-check.yml`. This is not optional: without
+`pull-requests: write` on the calling job, the default token is
+read-only and the comment step fails with `GraphQL: Resource not
+accessible by integration (addComment)` — the action logs a
+`::warning::` and continues, but no comment is posted. The repo's
+own dogfood workflow shipped without this block and two test runs
+posted nothing (fixed in v0.7.2).
 
 **Can I use it without failing PRs?**
 Yes — set `fail-on-diff: 'false'`. You'll still get the diff as a comment and artifact.

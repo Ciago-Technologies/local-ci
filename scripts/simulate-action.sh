@@ -143,9 +143,35 @@ else
   echo "PASS: scenario run"
 fi
 
+# 8. Ignore git_commit: identical except the commit → exit 0 with
+#    --ignore git_commit (dogfood: a baseline's commit always
+#    differs from the PR head, so the Action ignores it).
+echo ""
+echo "== Scenario: ignore git_commit (expect exit 0) =="
+mkdir -p "$TMP/ignore-commit"
+cp "$FIX/local.json" "$TMP/ignore-commit/local.json"
+python3 -c "
+import json
+d = json.load(open('$FIX/local.json'))
+d['git_commit'] = 'different00000000000000000000000000000000'
+json.dump(d, open('$TMP/ignore-commit/ci.json', 'w'))
+"
+"$TMP/localci" diff --ignore git_commit "$TMP/ignore-commit/local.json" "$TMP/ignore-commit/ci.json" > "$TMP/ignore-commit/diff.txt" 2>&1
+got_exit=$?
+cat "$TMP/ignore-commit/diff.txt"
+if [ "$got_exit" -ne 0 ]; then
+  echo "FAIL: scenario ignore-commit exited $got_exit, want 0"
+  fail=1
+elif ! grep -q "No differences" "$TMP/ignore-commit/diff.txt"; then
+  echo "FAIL: scenario ignore-commit did not report no differences"
+  fail=1
+else
+  echo "PASS: scenario ignore-commit"
+fi
+
 echo ""
 if [ "$fail" -ne 0 ]; then
   echo "SIMULATION FAILED"
   exit 1
 fi
-echo "SIMULATION PASSED: 7/7 scenarios"
+echo "SIMULATION PASSED: 8/8 scenarios"
