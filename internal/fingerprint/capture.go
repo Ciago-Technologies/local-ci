@@ -274,6 +274,17 @@ func servicesFromWorkflows(root string) map[string]string {
 	return usage.ServiceImages
 }
 
+// DockerfileBase returns the base image from dir's Dockerfile
+// (the first FROM line), e.g. "node:20-alpine". Empty when there
+// is no Dockerfile. Used by `localci run` for image selection.
+func DockerfileBase(dir string) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return ""
+	}
+	return dockerfileBase(abs)
+}
+
 // dockerfileBase returns the base image from the repo's Dockerfile
 // (the first FROM line), e.g. "node:20-alpine". Empty when there
 // is no Dockerfile.

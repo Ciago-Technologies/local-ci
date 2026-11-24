@@ -1,0 +1,21 @@
+name: CI
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: npm test -- --watchAll=false
+        env:
+          NODE_ENV: test
+          STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
+      - name: Deploy
+        uses: actions/deploy@v1

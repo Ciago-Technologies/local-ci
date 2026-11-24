@@ -120,10 +120,23 @@ Exit criteria: a lockfile change now reads as "react went
 18.2.0 → 18.3.0", not "hash changed" — and a repo that only
 works on one OS / runtime is fingerprinted, not guessed.
 
-## Phase 6 — Run the failing step locally
+## Phase 6 — Run the failing step locally (done, v0.6.0-phase6)
 
-- Optional: run a single command in a container matching the CI image, using the fingerprint to pick the image
-- Explicitly out of scope for Phases 1–5 — do not build a full `act` clone
+- `localci run -- <command>` runs one command in a Docker container
+  matching the CI image; repo mounted at `/work`, exit code passed through
+- `localci run --workflow FILE --job JOB --step NAME` runs one workflow
+  step's `run:` script in the container matching that job's runs-on
+- Image selection: `--image` flag, CI fingerprint runner image
+  (ubuntu24 → ubuntu:24.04), Dockerfile FROM, runs-on label, default ubuntu:24.04
+- `uses:` steps refused; `${{ ... }}` env values skipped with a warning;
+  job services warned about, not started; `--env NAME[=VALUE]` opt-in only,
+  values never printed (masked in --dry-run)
+- Docker required at run time; `--dry-run` shows the exact docker command
+- Deliberately not a full `act` clone: one command, one container, no services
+
+Exit criteria: a failing `npm test` step can be reproduced locally in
+the matching container with one command — and a machine without Docker
+gets a clear error, not a silent failure.
 
 ## Phase 7 — Launch
 

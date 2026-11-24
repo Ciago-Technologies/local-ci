@@ -17,11 +17,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Ciago-Technologies/local-ci/internal/container"
 	"github.com/Ciago-Technologies/local-ci/internal/fingerprint"
 	"github.com/Ciago-Technologies/local-ci/internal/workflow"
 )
 
-const version = "0.5.0-phase5"
+const version = "0.6.0-phase6"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -38,6 +39,8 @@ func main() {
 		os.Exit(runCapture(os.Args[2:]))
 	case "diff":
 		os.Exit(runDiff(os.Args[2:]))
+	case "run":
+		os.Exit(runRun(os.Args[2:]))
 	default:
 		fmt.Fprintf(os.Stderr, "localci: unknown command %q\n\n", os.Args[1])
 		usage()
@@ -67,6 +70,17 @@ Usage:
                                   support: one baseline per OS/runtime
                                   cell), then compare. Warns when the
                                   baseline is older than 30 days.
+  localci run [--image IMG] [--dir DIR] [--fingerprint ci.json]
+              [--env NAME[=VALUE] ...] [--dry-run] -- <command...>
+                                  Run one command in a Docker container
+                                  matching the CI environment. The repo
+                                  is mounted at /work; the exit code is
+                                  the command's. Docker is required.
+  localci run --workflow FILE --job JOB --step NAME [--dir DIR]
+              [--env ...] [--dry-run]
+                                  Run one workflow step's run: script
+                                  in the matching container. Only run:
+                                  steps — uses: steps can't run here.
 
 No secrets: LocalCI records env var names only, never values,
 unless you explicitly opt in with --include-values.
@@ -195,6 +209,93 @@ func runDiff(args []string) int {
 		return 0
 	}
 	return 1
+}
+
+// envFlag collects repeated --env flags.
+type envFlag []string
+
+func (e *envFlag) String() string { return strings.Join(*e, ",") }
+func (e *envFlag) Set(v string) error {
+	*e = append(*e, v)
+	return nil
+}
+
+func runRun(args []string) int {
+	fs := flag.NewFlagSet("run", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	image := fs.String("image", "", "container image (overrides all image selection)")
+	dir := fs.String("dir", ".", "repo directory to mount at /work")
+	fpPath := fs.String("fingerprint", "", "CI fingerprint JSON, used to pick the image")
+	workflowFile := fs.String("workflow", "", "workflow file to take a step from")
+	jobName := fs.String("job", "", "job name (with --workflow)")
+	stepName := fs.String("step", "", "step name (with --workflow)")
+	dryRun := fs.Bool("dry-run", false, "print the docker command instead of running it")
+	var envs envFlag
+	fs.Var(&envs, "env", "env var to pass into the container: NAME (from host) or NAME=VALUE; repeatable")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	opts := container.Options{
+		Image:  *image,
+		Dir:    *dir,
+		Env:    []string(envs),
+		DryRun: *dryRun,
+	}
+
+	if *workflowFile != "" {
+		if *jobName == "" || *stepName == "" {
+			fmt.Fprintln(os.Stderr, "localci run: --workflow needs --job and --step")
+			return 2
+		}
+		if fs.NArg() != 0 {
+			fmt.Fprintln(os.Stderr, "localci run: with --workflow, give no command — the step's run: script is used")
+			return 2
+		}
+		info, err := workflow.FindStep(*workflowFile, *jobName, *stepName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci run: %v\n", err)
+			return 2
+		}
+		opts.RunsOn = info.RunsOn
+		opts.Command = []string{info.Step.Run}
+		opts.Script = true
+		for k, v := range info.Step.Env {
+			opts.Env = append(opts.Env, k+"="+v)
+		}
+		if len(info.Step.SkippedEnv) > 0 {
+			fmt.Fprintf(os.Stderr, "localci run: warning: env %s reference secrets or expressions — pass them with --env NAME=VALUE\n", strings.Join(info.Step.SkippedEnv, ", "))
+		}
+		if len(info.Services) > 0 {
+			fmt.Fprintf(os.Stderr, "localci run: warning: job uses services (%s) — localci run does not start them; start them yourself first\n", strings.Join(info.Services, ", "))
+		}
+	} else {
+		if fs.NArg() == 0 {
+			fmt.Fprintln(os.Stderr, "localci run: usage: localci run [--image IMG] [--dry-run] -- <command...>")
+			return 2
+		}
+		opts.Command = fs.Args()
+	}
+
+	if *fpPath != "" {
+		fp, err := loadFingerprint(*fpPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci run: %v\n", err)
+			return 2
+		}
+		opts.Fingerprint = fp
+	}
+	if opts.DockerfileImage == "" {
+		// Local Dockerfile, for image selection when nothing else applies.
+		opts.DockerfileImage = fingerprint.DockerfileBase(*dir)
+	}
+
+	code, err := container.Run(opts, os.Stdout, os.Stderr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "localci run: %v\n", err)
+		return 2
+	}
+	return code
 }
 
 func loadFingerprint(path string) (*fingerprint.Fingerprint, error) {

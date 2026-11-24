@@ -92,6 +92,26 @@ major version change, lockfile drift), **warning** (minor version
 drift, timezone, locale), **info** (CPU/memory — a laptop and a CI
 runner rarely have the same hardware).
 
+## Run a failing step locally
+
+```sh
+# One command in the CI-matching container (repo mounted at /work):
+localci run -- npm test
+
+# One workflow step's run: script, in the container matching its job:
+localci run --workflow .github/workflows/ci.yml --job test --step Test
+
+# See the docker command without running it:
+localci run --dry-run -- npm test
+```
+
+The image is picked from `--image`, the CI fingerprint's runner
+image, the repo Dockerfile, the job's `runs-on` label, or the
+`ubuntu:24.04` default. Docker is required. No host env vars are
+passed unless you name them with `--env NAME` or `--env NAME=VALUE`
+(values are never printed). `uses:` steps can't run here, and job
+`services:` are left to you. Full details: [docs/RUN.md](docs/RUN.md).
+
 ## GitHub Action
 
 On every PR, capture in CI and compare with a baseline committed from your laptop:
@@ -125,7 +145,7 @@ Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 - **Phase 3** — Workflow-aware diff + fix suggestions + severity (done)
 - **Phase 4** — Matrix + baseline freshness (done)
 - **Phase 5** — Fingerprint coverage (runtimes, services, lockfile detail) (done)
-- **Phase 6** — Run the failing step locally in a matching container
+- **Phase 6** — Run the failing step locally in a matching container (done)
 - **Phase 7** — Launch: demo, docs, GitLab, good-first-issues
 
 Full plan: [docs/ROADMAP.md](docs/ROADMAP.md)

@@ -8,6 +8,8 @@
 #   3. missing   — no baseline → warning, check passes
 #   4. workflow-aware — same mismatch, but with --workflows the
 #      diff only shows what the job actually uses (3 of 7)
+#   7. run — `localci run --dry-run` shows the exact docker command
+#      for a workflow step (image from runs-on, secrets skipped).
 #
 # Usage: ./scripts/simulate-action.sh
 # Requires: go 1.23+, bash. Exits non-zero if any scenario misbehaves.
@@ -119,9 +121,31 @@ else
   echo "PASS: scenario lockfile detail"
 fi
 
+# 7. Run: dry-run a workflow step — no Docker needed for the check.
+echo ""
+echo "== Scenario: run dry-run (expect exit 0, ubuntu:24.04 from runs-on) =="
+mkdir -p "$TMP/run"
+"$TMP/localci" run --dry-run --dir "$TMP/run" \
+  --workflow "$ROOT/internal/workflow/testdata/run.yml" --job test --step Test \
+  > "$TMP/run/out.txt" 2>&1
+got_exit=$?
+cat "$TMP/run/out.txt"
+if [ "$got_exit" -ne 0 ]; then
+  echo "FAIL: scenario run exited $got_exit, want 0"
+  fail=1
+elif ! grep -q "image: ubuntu:24.04 (from runs-on ubuntu-latest)" "$TMP/run/out.txt" \
+  || ! grep -q "sh -c 'npm test -- --watchAll=false'" "$TMP/run/out.txt" \
+  || ! grep -q "STRIPE_KEY reference secrets" "$TMP/run/out.txt" \
+  || ! grep -q "services (postgres:16)" "$TMP/run/out.txt"; then
+  echo "FAIL: scenario run did not show the expected image, command, and warnings"
+  fail=1
+else
+  echo "PASS: scenario run"
+fi
+
 echo ""
 if [ "$fail" -ne 0 ]; then
   echo "SIMULATION FAILED"
   exit 1
 fi
-echo "SIMULATION PASSED: 6/6 scenarios"
+echo "SIMULATION PASSED: 7/7 scenarios"

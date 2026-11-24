@@ -11,6 +11,7 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -75,7 +76,18 @@ func ParseDir(dir string) (*Usage, error) {
 	}
 	sort.Strings(u.Files)
 	sort.Strings(u.Services)
+	u.Services = uniqueStrings(u.Services)
 	return u, nil
+}
+
+func uniqueStrings(in []string) []string {
+	var out []string
+	for i, s := range in {
+		if i == 0 || s != in[i-1] {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func parseWorkflow(wf map[string]interface{}, u *Usage) {
@@ -215,6 +227,117 @@ func scanRunScript(script string, u *Usage) {
 	if strings.Contains(lower, "mvn ") || strings.Contains(lower, "gradle") {
 		u.addRuntime("java", "")
 	}
+}
+
+// Step is one workflow step that can be run locally.
+type Step struct {
+	// Name is the step's name, or "run: <first words>" when unnamed.
+	Name string
+	// Run is the shell script (only for run: steps).
+	Run string
+	// Uses is the action reference (only for uses: steps).
+	Uses string
+	// Env holds the step's literal env vars. Values containing
+	// ${{ ... }} expressions are omitted — LocalCI cannot resolve
+	// secrets or contexts, and never guesses at them.
+	Env map[string]string
+	// SkippedEnv names env vars omitted because they contain
+	// ${{ ... }} expressions.
+	SkippedEnv []string
+}
+
+// JobInfo is what localci run needs from a workflow job.
+type JobInfo struct {
+	// RunsOn is the job's runs-on label.
+	RunsOn string
+	// Services lists the job's service images.
+	Services []string
+	// Step is the selected step.
+	Step *Step
+}
+
+// FindStep returns a job's step by name from a workflow file.
+// Only run: steps can be run locally — a uses: step returns an
+// error saying so, instead of silently doing nothing.
+func FindStep(file, jobName, stepName string) (*JobInfo, error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	var wf map[string]interface{}
+	if err := yaml.Unmarshal(data, &wf); err != nil {
+		return nil, err
+	}
+	jobs, ok := asMap(wf["jobs"])
+	if !ok {
+		return nil, fmt.Errorf("no jobs in %s", file)
+	}
+	jobRaw, ok := jobs[jobName]
+	if !ok {
+		return nil, fmt.Errorf("job %q not found in %s", jobName, file)
+	}
+	job, ok := asMap(jobRaw)
+	if !ok {
+		return nil, fmt.Errorf("job %q is not a mapping in %s", jobName, file)
+	}
+	info := &JobInfo{}
+	if runsOn, ok := job["runs-on"]; ok {
+		if list := asStringList(runsOn); len(list) > 0 {
+			info.RunsOn = list[0]
+		}
+	}
+	svcUsage := &Usage{ServiceImages: map[string]string{}}
+	parseServices(job["services"], svcUsage)
+	info.Services = svcUsage.Services
+	steps, ok := job["steps"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("job %q has no steps in %s", jobName, file)
+	}
+	for _, stepRaw := range steps {
+		step, ok := asMap(stepRaw)
+		if !ok {
+			continue
+		}
+		name, _ := step["name"].(string)
+		run, _ := step["run"].(string)
+		uses, _ := step["uses"].(string)
+		display := name
+		if display == "" {
+			display = "run: " + firstWords(run, 6)
+		}
+		if display != stepName && name != stepName {
+			continue
+		}
+		if uses != "" {
+			return nil, fmt.Errorf("step %q uses %s — localci run only runs `run:` steps, not actions", display, uses)
+		}
+		if run == "" {
+			return nil, fmt.Errorf("step %q has no `run:` script in %s", display, file)
+		}
+		s := &Step{Name: display, Run: run, Uses: uses, Env: map[string]string{}}
+		if env, ok := asMap(step["env"]); ok {
+			for k, v := range env {
+				sv, _ := v.(string)
+				if strings.Contains(sv, "${{") {
+					s.SkippedEnv = append(s.SkippedEnv, k)
+					continue
+				}
+				s.Env[k] = sv
+			}
+			sort.Strings(s.SkippedEnv)
+		}
+		info.Step = s
+		return info, nil
+	}
+	return nil, fmt.Errorf("step %q not found in job %q in %s", stepName, jobName, file)
+}
+
+func firstWords(s string, n int) string {
+	fields := strings.Fields(s)
+	if len(fields) > n {
+		fields = fields[:n]
+	}
+	return strings.Join(fields, " ")
 }
 
 // UsedRuntime reports whether any workflow uses this runtime.
