@@ -7,8 +7,10 @@
 # PR changes a runtime or lockfile the laptop doesn't have, the check
 # fails with the diff and a fix suggestion.
 name: LocalCI dogfood
+
 on:
   pull_request:
+
 jobs:
   localci:
     runs-on: ubuntu-latest
