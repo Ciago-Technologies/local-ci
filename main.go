@@ -22,7 +22,7 @@ import (
 	"github.com/Ciago-Technologies/local-ci/internal/workflow"
 )
 
-const version = "0.7.0"
+const version = "0.7.1"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -134,6 +134,7 @@ func runDiff(args []string) int {
 	workflowsDir := fs.String("workflows", "", "workflow directory (e.g. .github/workflows) — hide differences in things no job uses")
 	showUnused := fs.Bool("show-unused", false, "with --workflows, show the hidden differences too")
 	baselineDir := fs.String("baseline-dir", "", "pick the baseline from DIR that best matches the CI fingerprint (matrix support); takes one positional arg, the CI fingerprint")
+	ignore := fs.String("ignore", "", "comma-separated diff fields to drop, e.g. git_commit (a baseline's commit always differs from a PR head, so the Action ignores it)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -182,6 +183,9 @@ func runDiff(args []string) int {
 	}
 
 	diffs := fingerprint.Diff(a, b)
+	if *ignore != "" {
+		diffs = fingerprint.IgnoreFields(diffs, strings.Split(*ignore, ","))
+	}
 	var hidden []fingerprint.Difference
 	if *workflowsDir != "" {
 		usage, err := workflow.ParseDir(*workflowsDir)

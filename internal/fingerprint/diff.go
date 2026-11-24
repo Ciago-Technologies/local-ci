@@ -182,6 +182,29 @@ func HasActionable(diffs []Difference) bool {
 // HasCritical is the same as HasActionable, with a clearer name.
 func HasCritical(diffs []Difference) bool { return HasActionable(diffs) }
 
+// IgnoreFields drops diffs whose field is in ignore (e.g.
+// "git_commit"). A baseline is an environment snapshot, not a
+// commit pointer: in CI the baseline's commit always differs from
+// the PR head, so the Action ignores git_commit — otherwise every
+// PR would fail on the commit alone. Standalone `localci diff`
+// keeps git_commit unless asked, via --ignore.
+func IgnoreFields(diffs []Difference, ignore []string) []Difference {
+	if len(ignore) == 0 {
+		return diffs
+	}
+	ignored := map[string]bool{}
+	for _, f := range ignore {
+		ignored[strings.TrimSpace(f)] = true
+	}
+	var out []Difference
+	for _, d := range diffs {
+		if !ignored[d.Field] {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 // WorkflowUsage is the minimal interface Diff needs from a parsed
 // workflow directory, so this package does not depend on YAML.
 type WorkflowUsage interface {

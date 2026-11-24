@@ -157,12 +157,23 @@ gets a clear error, not a silent failure.
   files them from these drafts.
 - Repo's own CI verified green: latest run (Phase 6, 11a8bb44)
   completed with conclusion `success` via the GitHub API.
-- Still open: live `localci run` in a real container — the Muse VM
-  cannot run containers (no cgroup controllers: runc fails on setns,
-  crun fails on the missing `io` controller), so it is tested by the
-  `live-run` job in CI instead; submitting to awesome lists.
-  v0.6.0 is released to the Marketplace; v0.7.0 follows with the
-  Phase 7 docs/demo/GitLab.
+- Still open: submitting to awesome lists.
+
+## v0.7.1 — Dogfood fixes (done)
+
+Dogfooding the Action on its own repo (PR #1, PR #2) exposed three
+real defects, all fixed here:
+
+- `gh pr comment` ran without `GH_TOKEN`, so the PR comment was
+  never posted (the `|| echo` fallback swallowed the error). The
+  Action now sets `GH_TOKEN: ${{ github.token }}` on the comment step.
+- The diff was never printed to the job log — only to the artifact —
+  while the fail message said "see the diff above". The diff step
+  now cats `localci-diff.txt`.
+- `git_commit` was compared, which would fail every PR on the
+  commit alone (a baseline's commit always differs from the PR
+  head). New `localci diff --ignore` flag; the Action passes
+  `--ignore git_commit`. Tests: 44 passing, simulation 8/8.
 
 Exit criteria: someone who has never seen LocalCI can install it,
 run the demo, and understand the point in 30 seconds — and the
