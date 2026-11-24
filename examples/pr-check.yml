@@ -1,0 +1,43 @@
+# Example: check every PR with LocalCI.
+#
+# Copy this file to .github/workflows/localci.yml in your repo.
+#
+# Prerequisites:
+#   1. On your laptop, in your repo:
+#        localci capture -o .localci/local.json
+#        git add .localci/local.json && git commit -m "Add LocalCI baseline"
+#   2. Keep .localci/local.json up to date when your environment
+#      intentionally changes (new Node version, new env var, ...):
+#        localci capture -o .localci/local.json
+#        git add .localci/local.json && git commit -m "Update LocalCI baseline"
+#
+# What happens on a PR:
+#   - localci captures a fingerprint in CI and diffs it against
+#     .localci/local.json
+#   - The diff is posted as a PR comment and uploaded as an artifact
+#   - The check fails when differences are found
+#
+# To warn instead of failing, set fail-on-diff: 'false'.
+name: LocalCI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  localci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: LocalCI — local vs CI
+        uses: Ciago-Technologies/local-ci@v1
+        with:
+          local-fingerprint: .localci/local.json
+          fail-on-diff: 'true'
+          comment-on-pr: 'true'
