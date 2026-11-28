@@ -317,3 +317,19 @@ func containsString(s, sub string) bool {
 		return false
 	})()
 }
+
+func TestDiff_ToolsBackwardCompatible(t *testing.T) {
+	// Old baseline has no tools field; new CI fingerprint does.
+	// That must not flag every tool as missing in the baseline.
+	a := &Fingerprint{}
+	b := &Fingerprint{Tools: map[string]string{"git": "2.43.0"}}
+	if diffs := Diff(a, b); len(diffs) != 0 {
+		t.Errorf("old baseline vs new CI diffs = %v, want none for tools", diffs)
+	}
+	// Both sides new: a real drift is shown.
+	a.Tools = map[string]string{"git": "2.42.0"}
+	diffs := Diff(a, b)
+	if len(diffs) != 1 || diffs[0].Field != "tool:git" {
+		t.Errorf("tool drift diffs = %v, want one tool:git", diffs)
+	}
+}

@@ -85,4 +85,12 @@ type Fingerprint struct {
 	// e.g. "package-lock.json" -> {"react": "18.2.0"}. The hash in
 	// Lockfiles says a lockfile changed; this says which packages.
 	LockfilePackages map[string]map[string]string `json:"lockfile_packages,omitempty"`
+
+	// Tools maps a common CI tool name ("git", "docker", "make")
+	// to its version string, e.g. git -> "2.43.0". Only tools
+	// present on PATH are recorded. This is a scoped inventory,
+	// not a full system-package list — the full list is too big
+	// and too noisy, and OS release + runner image cover the
+	// common cases.
+	Tools map[string]string `json:"tools,omitempty"`
 }

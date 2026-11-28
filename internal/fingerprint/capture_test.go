@@ -93,13 +93,15 @@ func TestCapture_ExtraRuntimes(t *testing.T) {
 	stubRuntime(t, bin, "java", `openjdk version "17.0.9" 2024-01-16`)
 	stubRuntime(t, bin, "ruby", "ruby 3.3.0p0 (2023-12-25 revision 5124f9ac75)")
 	stubRuntime(t, bin, "dotnet", "8.0.100")
+	stubRuntime(t, bin, "bun", "1.2.19")
+	stubRuntime(t, bin, "deno", "deno 2.1.4 (stable, release, x86_64-unknown-linux-gnu)")
 	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
 
 	fp, err := Capture(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"rust": "1.83.0", "java": "17.0.9", "ruby": "3.3.0", "dotnet": "8.0.100"}
+	want := map[string]string{"rust": "1.83.0", "java": "17.0.9", "ruby": "3.3.0", "dotnet": "8.0.100", "bun": "1.2.19", "deno": "2.1.4"}
 	for k, v := range want {
 		if fp.Runtimes[k] != v {
 			t.Errorf("runtime %s = %q, want %q (all: %v)", k, fp.Runtimes[k], v, fp.Runtimes)
@@ -174,4 +176,21 @@ func TestCapture_CaseSensitivityRuns(t *testing.T) {
 		}
 	}
 	_ = fp
+}
+
+func TestCapture_Tools(t *testing.T) {
+	// git is present in this environment; its version must be recorded.
+	fp, err := Capture(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fp.Tools["git"] == "" {
+		t.Error("Tools[git] empty, want a version")
+	}
+	// No tool value should be an empty string.
+	for k, v := range fp.Tools {
+		if v == "" {
+			t.Errorf("Tools[%s] empty", k)
+		}
+	}
 }

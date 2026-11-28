@@ -40,6 +40,12 @@ type Options struct {
 	// Env lists vars to pass into the container: "NAME" (value
 	// taken from the host environment) or "NAME=VALUE".
 	Env []string
+	// Services lists images to start detached before the main
+	// run, e.g. "postgres:16" or "db=postgres:16". Each starts as
+	// docker run -d --name localci-<name> <image> and is left
+	// running afterwards — the caller stops it with
+	// `docker rm -f localci-<name>`.
+	Services []string
 	// DryRun prints the docker command instead of running it.
 	DryRun bool
 	// Command is the command to run inside the container.
@@ -155,6 +161,68 @@ func BuildArgs(o Options, image string) ([]string, error) {
 	return args, nil
 }
 
+// ServiceContainerName returns the detached container name for a
+// service image: "postgres:16" -> "localci-postgres",
+// "db=postgres:16" -> "localci-db".
+func ServiceContainerName(service string) string {
+	name, image := service, service
+	if n, img, ok := strings.Cut(service, "="); ok && n != "" && img != "" {
+		name, image = n, img
+	} else {
+		// Name from the image: last path segment before the tag.
+		base := image
+		if i := strings.LastIndexByte(base, '/'); i >= 0 {
+			base = base[i+1:]
+		}
+		if i := strings.IndexByte(base, ':'); i >= 0 {
+			base = base[:i]
+		}
+		if i := strings.IndexByte(base, '@'); i >= 0 {
+			base = base[:i]
+		}
+		name = base
+	}
+	// Sanitise to [a-z0-9-].
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('-')
+		}
+	}
+	name = strings.Trim(b.String(), "-")
+	if name == "" {
+		name = "service"
+	}
+	return "localci-" + name
+}
+
+// ServiceImage returns just the image part of a --service entry.
+func ServiceImage(service string) string {
+	if _, img, ok := strings.Cut(service, "="); ok && img != "" {
+		return img
+	}
+	return service
+}
+
+// ServiceStartArgs returns the docker argv to start one service detached.
+func ServiceStartArgs(service string) []string {
+	return []string{"run", "-d", "--name", ServiceContainerName(service), ServiceImage(service)}
+}
+
+// ServiceStartCommands returns the docker commands to start all services.
+func (o Options) ServiceStartCommands() [][]string {
+	var out [][]string
+	for _, s := range o.Services {
+		if strings.TrimSpace(s) == "" {
+			continue
+		}
+		out = append(out, ServiceStartArgs(s))
+	}
+	return out
+}
+
 // DryRunString renders the docker command as a human would type
 // it, with env values masked (names only — values are never
 // printed, even in --dry-run output).
@@ -189,16 +257,33 @@ func Run(o Options, stdout, stderr io.Writer) (int, error) {
 		return 2, err
 	}
 	if o.DryRun {
+		for _, svcArgs := range o.ServiceStartCommands() {
+			fmt.Fprintf(stdout, "# service: docker %s\n", strings.Join(svcArgs, " "))
+		}
 		s, err := DryRunString(o, image)
 		if err != nil {
 			return 2, err
 		}
 		fmt.Fprintf(stdout, "# image: %s (%s)\n%s\n", image, source, s)
+		if len(o.ServiceStartCommands()) > 0 {
+			fmt.Fprintf(stdout, "# services are left running — stop them with: docker rm -f %s\n", serviceNames(o))
+		}
 		return 0, nil
 	}
 	docker, err := exec.LookPath("docker")
 	if err != nil {
 		return 2, ErrDockerMissing
+	}
+	// Start services first, detached. They are left running
+	// afterwards — print a reminder to stop them.
+	for _, svcArgs := range o.ServiceStartCommands() {
+		cmd := exec.Command(docker, svcArgs...)
+		cmd.Stdout = stderr
+		cmd.Stderr = stderr
+		if err := cmd.Run(); err != nil {
+			return 2, fmt.Errorf("starting service %s: %w (stop any running service with docker rm -f %s)", svcArgs[len(svcArgs)-1], err, ServiceContainerName(svcArgs[len(svcArgs)-1]))
+		}
+		fmt.Fprintf(stderr, "localci run: service started: %s\n", ServiceContainerName(svcArgs[len(svcArgs)-1]))
 	}
 	args, err := BuildArgs(o, image)
 	if err != nil {
@@ -211,11 +296,27 @@ func Run(o Options, stdout, stderr io.Writer) (int, error) {
 	cmd.Stdin = os.Stdin
 	if err := cmd.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
+			if len(o.ServiceStartCommands()) > 0 {
+				fmt.Fprintf(stderr, "localci run: services left running: %s (docker rm -f %s to stop)\n", serviceNames(o), serviceNames(o))
+			}
 			return ee.ExitCode(), nil
 		}
 		return 2, err
 	}
+	if len(o.ServiceStartCommands()) > 0 {
+		fmt.Fprintf(stderr, "localci run: services left running: %s (docker rm -f %s to stop)\n", serviceNames(o), serviceNames(o))
+	}
 	return 0, nil
+}
+
+func serviceNames(o Options) string {
+	var names []string
+	for _, s := range o.Services {
+		if strings.TrimSpace(s) != "" {
+			names = append(names, ServiceContainerName(s))
+		}
+	}
+	return strings.Join(names, " ")
 }
 
 // shellJoin joins a command for sh -c, quoting each word.

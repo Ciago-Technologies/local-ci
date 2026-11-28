@@ -84,6 +84,7 @@ func CaptureWithOptions(dir string, opts CaptureOptions) (*Fingerprint, error) {
 		ExecutableFiles:  execs,
 		Symlinks:         syms,
 		LockfilePackages: lockfilePackages(abs),
+		Tools:            tools(),
 	}
 	if len(opts.IncludeValues) > 0 {
 		fp.EnvValues = map[string]string{}
@@ -163,6 +164,51 @@ func runtimes() map[string]string {
 	// dotnet --version prints "8.0.100".
 	if v := commandVersion("dotnet", "--version"); v != "" {
 		out["dotnet"] = v
+	}
+	// bun --version prints just the version, e.g. "1.2.19".
+	if v := commandVersion("bun", "--version"); v != "" {
+		out["bun"] = strings.TrimPrefix(v, "v")
+	}
+	// deno --version prints "deno 2.1.4 (stable, ...)".
+	if v := commandVersion("deno", "--version"); v != "" {
+		if ver := versionWord(v, "deno"); ver != "" {
+			out["deno"] = ver
+		}
+	}
+	return out
+}
+
+// tools records versions of common CI tools that are on PATH.
+// Scoped to a short allowlist — a full package inventory is
+// deliberately not done (too big, too noisy).
+func tools() map[string]string {
+	out := map[string]string{}
+	if v := commandVersion("git", "--version"); v != "" {
+		if ver := versionWord(v, "git"); ver != "" {
+			out["git"] = ver
+		}
+	}
+	if v := commandVersion("docker", "--version"); v != "" {
+		// "Docker version 24.0.7, build ..." -> "24.0.7"
+		if ver := versionWord(v, "version"); ver != "" {
+			out["docker"] = strings.TrimSuffix(ver, ",")
+		}
+	}
+	if v := commandVersion("make", "--version"); v != "" {
+		// "GNU Make 4.3" -> "4.3"
+		if ver := versionWord(v, "Make"); ver != "" {
+			out["make"] = ver
+		}
+	}
+	if v := commandVersion("gcc", "--version"); v != "" {
+		if ver := versionWord(v, "gcc"); ver != "" {
+			out["gcc"] = ver
+		}
+	}
+	if v := commandVersion("curl", "--version"); v != "" {
+		if ver := versionWord(v, "curl"); ver != "" {
+			out["curl"] = ver
+		}
 	}
 	return out
 }

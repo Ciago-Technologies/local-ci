@@ -116,6 +116,27 @@ func Diff(a, b *Fingerprint) []Difference {
 		}
 	}
 
+	// Tools: union of names. A missing tool is critical (the step
+	// cannot run at all); a version drift is a warning.
+	// Backward-compatible: fingerprints captured before v0.7.4
+	// have no tools field at all — skip the comparison entirely
+	// when either side recorded no tools, instead of flagging
+	// every tool as "missing in the baseline".
+	if len(a.Tools) > 0 && len(b.Tools) > 0 {
+		for _, name := range unionKeys(a.Tools, b.Tools) {
+			av, aok := a.Tools[name]
+			bv, bok := b.Tools[name]
+			switch {
+			case !aok:
+				add("tool:"+name, "(missing)", bv, "missing locally", SeverityCritical)
+			case !bok:
+				add("tool:"+name, av, "(missing)", "missing in CI", SeverityCritical)
+			case av != bv:
+				add("tool:"+name, av, bv, "", SeverityWarning)
+			}
+		}
+	}
+
 	// Env names: names only, never values.
 	for _, name := range unionStrings(a.EnvNames, b.EnvNames) {
 		inA := contains(a.EnvNames, name)
@@ -267,6 +288,8 @@ func workflowUses(d Difference, usage WorkflowUsage) bool {
 	case strings.HasPrefix(d.Field, "env_value:"):
 		return true
 	case strings.HasPrefix(d.Field, "lockfile:"):
+		return true
+	case strings.HasPrefix(d.Field, "tool:"):
 		return true
 	case strings.HasPrefix(d.Field, "service:"):
 		return true

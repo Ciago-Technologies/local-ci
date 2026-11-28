@@ -71,13 +71,27 @@ through. Values containing `${{ ... }}` expressions (secrets,
 contexts) are skipped with a warning — LocalCI cannot resolve them
 and never guesses. Pass them yourself with `--env`.
 
+## Services
+
+Job `services:` (e.g. `postgres:16`) are not started by default —
+`localci run` warns and leaves them to you. Pass `--service` to
+start them detached first:
+
+```sh
+localci run --service postgres:16 --workflow .github/workflows/ci.yml --job test --step Test
+# service: docker run -d --name localci-postgres postgres:16
+# services are left running — stop them with: docker rm -f localci-postgres
+```
+
+`--service` is repeatable, and accepts `name=image` (`--service db=postgres:16`
+starts `localci-db`). Services are left running after the step, so
+you can inspect the database — stop them with the `docker rm -f`
+command printed at the end.
+
 ## What it won't do
 
 - `uses:` steps — actions are code, not shell commands. `localci run`
   refuses them and names the action.
-- Job `services:` (e.g. `postgres:16`) — it warns and leaves them to
-  you. Start them yourself first (`docker run -d postgres:16`), then
-  run the step.
 - Matrix jobs — pick one cell's workflow/job and run that.
 
 ## Checking what it would run

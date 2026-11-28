@@ -36,7 +36,7 @@ Lockfile: local a1b2c3, CI d4e5f6
 No secrets. LocalCI only records env var **names**, never values.
 
 > Available on the [GitHub Marketplace](https://github.com/marketplace/actions/ciago-localci)
-> — install with `uses: Ciago-Technologies/local-ci@v0.7.3`.
+> — install with `uses: Ciago-Technologies/local-ci@v0.7.4`.
 > Docs: [Action](docs/ACTION.md), [Run a step locally](docs/RUN.md),
 > [GitLab](docs/GITLAB.md), [Demo](docs/DEMO.md).
 
@@ -46,7 +46,7 @@ Tools like `act` run your whole pipeline locally. LocalCI does the opposite, sma
 
 - **Don't run all of CI locally. Find the difference.**
 - One static Go binary, no daemon, no server.
-- Works for Go, Node, Python, Rust, Java, Ruby, .NET — any repo with CI.
+- Works for Go, Node, Python, Rust, Java, Ruby, .NET, Bun — any repo with CI.
 - Built for the "works on my machine" moment, not for re-implementing GitHub Actions.
 
 ## Install
@@ -79,6 +79,7 @@ localci diff local.json ci.json
 # Exit 0 when they match, 1 when differences are found.
 
 localci diff --json local.json ci.json  # machine-readable output
+localci diff --sarif -o out.sarif local.json ci.json  # SARIF 2.1.0 for code scanning
 localci capture --dir /path/to/repo    # fingerprint a different directory
 
 # Workflow-aware: only warn about runtimes / env vars the jobs
@@ -125,8 +126,7 @@ The image is picked from `--image`, the CI fingerprint's runner
 image, the repo Dockerfile, the job's `runs-on` label, or the
 `ubuntu:24.04` default. Docker is required. No host env vars are
 passed unless you name them with `--env NAME` or `--env NAME=VALUE`
-(values are never printed). `uses:` steps can't run here, and job
-`services:` are left to you. Full details: [docs/RUN.md](docs/RUN.md).
+(values are never printed). `uses:` steps can't run here. Job `services:` start with `--service postgres:16` (left running afterwards). Full details: [docs/RUN.md](docs/RUN.md).
 
 ## GitHub Action
 
@@ -145,7 +145,8 @@ Full setup, inputs, and FAQ: [docs/ACTION.md](docs/ACTION.md)
 
 ## What gets fingerprinted
 
-- Runtime versions: Go, Node, Python, Rust, Java, Ruby, .NET
+- Runtime versions: Go, Node, Python, Rust, Java, Ruby, .NET, Bun, Deno
+- CI tools: git, docker, make, gcc, curl versions when present
 - OS, arch, OS release (`ubuntu 24.04`), CPU / memory, runner image
 - Timezone, locale
 - Env var names only — never values (opt-in values with `--include-values`)

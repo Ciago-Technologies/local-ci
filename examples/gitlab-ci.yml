@@ -8,6 +8,13 @@
 # One-time setup on your laptop:
 #   localci capture -o .localci/local.json
 #   git add .localci/local.json && git commit -m "Add LocalCI baseline"
+#
+# MR comment: when the job runs for a merge request
+# ($CI_MERGE_REQUEST_IID is set), the diff is posted as an MR note
+# via the GitLab API using $CI_JOB_TOKEN (scripts/post-gitlab-mr.py).
+# If posting fails (token scope, forks), the diff is still in the
+# job log and the job still fails on differences — the comment is
+# best-effort, never silent.
 
 stages:
   - test
@@ -18,11 +25,22 @@ localci-check:
   script:
     - go install github.com/Ciago-Technologies/local-ci@latest
     - localci capture -o ci.json
-    - localci diff --workflows .github/workflows .localci/local.json ci.json
+    - |
+      set +e
+      localci diff --workflows .github/workflows .localci/local.json ci.json > localci-diff.txt 2>&1
+      DIFF_EXIT=$?
+      set -e
+      cat localci-diff.txt
+      # Save the diff as Markdown for the MR comment.
+      { echo '# LocalCI — local vs CI'; echo ''; echo '```'; cat localci-diff.txt; echo '```'; } > localci-diff.md
+    - python3 scripts/post-gitlab-mr.py || echo "LocalCI: MR comment step failed (see above); the diff is in the job log."
+    - exit $DIFF_EXIT
   artifacts:
     when: always
     paths:
       - ci.json
+      - localci-diff.txt
+      - localci-diff.md
   # Missing baseline? The diff fails with a clear error — commit
   # .localci/local.json first (see above). To warn instead of fail,
-  # add `|| true` to the diff line.
+  # add `|| true` to the diff line (and drop the final `exit $DIFF_EXIT`).

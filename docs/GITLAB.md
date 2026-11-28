@@ -31,12 +31,11 @@ See [examples/gitlab-ci.yml](../examples/gitlab-ci.yml).
 | Capture + diff | yes | yes |
 | Workflow-aware filtering | yes (`workflows-dir`) | yes (`--workflows`) |
 | Matrix baselines | yes (`baseline-dir`) | yes (`--baseline-dir`) |
-| PR comment with the diff | yes | no — the diff is in the job log |
-| Fingerprints as artifacts | yes | yes (`ci.json`) |
+| PR comment with the diff | yes | yes — MR note via the GitLab API (`scripts/post-gitlab-mr.py`, `CI_JOB_TOKEN`); best-effort, diff stays in the job log if posting fails |
+| Fingerprints as artifacts | yes | yes (`ci.json`, `localci-diff.txt`, `localci-diff.md`) |
 | Fail the check on diff | yes (`fail-on-diff`) | yes — the job exits 1 |
 
-The missing pieces on GitLab are presentation (no MR comment, no
-artifact upload to a PR), not detection. The diff itself, including
+The MR comment is presentation, not detection. The diff itself, including
 severity and fix suggestions, is identical — it's the same binary.
 
 ## Matrix builds

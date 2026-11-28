@@ -148,6 +148,10 @@ func parseUses(uses string, with map[string]interface{}, u *Usage) {
 		runtime, versionKey = "ruby", "ruby-version"
 	case strings.Contains(lower, "setup-dotnet"):
 		runtime, versionKey = "dotnet", "dotnet-version"
+	case strings.Contains(lower, "setup-bun"):
+		runtime, versionKey = "bun", "bun-version"
+	case strings.Contains(lower, "setup-deno"):
+		runtime, versionKey = "deno", "deno-version"
 	default:
 		return
 	}
@@ -182,7 +186,7 @@ func parseMatrix(strategyRaw interface{}, u *Usage) {
 		name := strings.ToLower(key)
 		name = strings.TrimSuffix(name, "-version")
 		switch name {
-		case "node", "go", "python", "java", "ruby", "dotnet":
+		case "node", "go", "python", "java", "ruby", "dotnet", "bun", "deno":
 			for _, v := range asStringList(raw) {
 				u.addRuntime(name, strings.TrimSpace(v))
 			}
@@ -223,6 +227,9 @@ func scanRunScript(script string, u *Usage) {
 	}
 	if strings.Contains(lower, "cargo test") || strings.Contains(lower, "cargo build") {
 		u.addRuntime("rust", "")
+	}
+	if strings.Contains(lower, "bun test") || strings.Contains(lower, "bun run") || strings.Contains(lower, "bun install") {
+		u.addRuntime("bun", "")
 	}
 	if strings.Contains(lower, "mvn ") || strings.Contains(lower, "gradle") {
 		u.addRuntime("java", "")
