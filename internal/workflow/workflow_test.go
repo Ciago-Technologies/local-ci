@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -90,5 +92,23 @@ func TestParseDirMissing(t *testing.T) {
 	// Fail-open: with no workflows, everything counts as used.
 	if !u.UsedRuntime("node") || !u.UsedEnv("ANYTHING") {
 		t.Error("fail-open: missing workflows should mark everything used")
+	}
+}
+
+func TestParseDir_Bun(t *testing.T) {
+	dir := t.TempDir()
+	wf := "name: CI\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: oven-sh/setup-bun@v2\n        with:\n          bun-version: '1.2.19'\n      - run: bun test\n"
+	if err := os.WriteFile(filepath.Join(dir, "ci.yml"), []byte(wf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	u, err := ParseDir(dir)
+	if err != nil {
+		t.Fatalf("ParseDir: %v", err)
+	}
+	if !u.UsedRuntime("bun") {
+		t.Error("expected bun to be used (oven-sh/setup-bun + bun test)")
+	}
+	if !u.Runtimes["bun"]["1.2.19"] {
+		t.Errorf("expected bun version 1.2.19, got %v", u.Runtimes["bun"])
 	}
 }
