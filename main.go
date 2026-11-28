@@ -22,7 +22,7 @@ import (
 	"github.com/Ciago-Technologies/local-ci/internal/workflow"
 )
 
-const version = "0.7.3"
+const version = "0.7.4"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -59,11 +59,13 @@ Usage:
                                   Writes to stdout unless -o is given.
                                   --include-values records values only for
                                   the named vars (e.g. NODE_ENV,TZ).
-  localci diff [--json] [--workflows DIR] [--show-unused] <a.json> <b.json>
+  localci diff [--json] [--sarif] [--sarif-out FILE] [--workflows DIR] [--show-unused] <a.json> <b.json>
                                   Compare two fingerprints. Exits 1 when
                                   differences are found, 0 when they match.
                                   --workflows hides differences in things
                                   no workflow job uses (false positives).
+                                  --sarif writes SARIF 2.1.0 for code
+                                  scanning; -o FILE is its output file.
   localci diff [--json] [--baseline-dir DIR] <ci.json>
                                   Pick the baseline from DIR that best
                                   matches the CI fingerprint (matrix
@@ -71,11 +73,14 @@ Usage:
                                   cell), then compare. Warns when the
                                   baseline is older than 30 days.
   localci run [--image IMG] [--dir DIR] [--fingerprint ci.json]
-              [--env NAME[=VALUE] ...] [--dry-run] -- <command...>
+              [--env NAME[=VALUE] ...] [--service IMAGE ...] [--dry-run] -- <command...>
                                   Run one command in a Docker container
                                   matching the CI environment. The repo
                                   is mounted at /work; the exit code is
                                   the command's. Docker is required.
+                                  --service starts a service image
+                                  detached first (e.g. postgres:16),
+                                  left running afterwards.
   localci run --workflow FILE --job JOB --step NAME [--dir DIR]
               [--env ...] [--dry-run]
                                   Run one workflow step's run: script
@@ -131,11 +136,18 @@ func runDiff(args []string) int {
 	fs := flag.NewFlagSet("diff", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	asJSON := fs.Bool("json", false, "print differences as JSON")
+	sarif := fs.Bool("sarif", false, "print differences as SARIF 2.1.0 (for GitHub code scanning / GitLab)")
+	sarifOut := fs.String("sarif-out", "", "write SARIF to FILE (with --sarif)")
+	outPath := fs.String("o", "", "write SARIF to FILE (with --sarif; same as --sarif-out)")
 	workflowsDir := fs.String("workflows", "", "workflow directory (e.g. .github/workflows) — hide differences in things no job uses")
 	showUnused := fs.Bool("show-unused", false, "with --workflows, show the hidden differences too")
 	baselineDir := fs.String("baseline-dir", "", "pick the baseline from DIR that best matches the CI fingerprint (matrix support); takes one positional arg, the CI fingerprint")
 	ignore := fs.String("ignore", "", "comma-separated diff fields to drop, e.g. git_commit (a baseline's commit always differs from a PR head, so the Action ignores it)")
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *asJSON && *sarif {
+		fmt.Fprintln(os.Stderr, "localci diff: --json and --sarif cannot be used together")
 		return 2
 	}
 
@@ -199,7 +211,25 @@ func runDiff(args []string) int {
 			}
 		}
 	}
-	if *asJSON {
+	if *sarif {
+		data, err := fingerprint.ToSARIF(diffs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
+			return 2
+		}
+		dest := *sarifOut
+		if dest == "" {
+			dest = *outPath
+		}
+		if dest != "" {
+			if err := os.WriteFile(dest, append(data, '\n'), 0o644); err != nil {
+				fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
+				return 2
+			}
+		} else {
+			fmt.Println(string(data))
+		}
+	} else if *asJSON {
 		data, err := json.MarshalIndent(diffs, "", "  ")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "localci diff: %v\n", err)
@@ -236,15 +266,18 @@ func runRun(args []string) int {
 	dryRun := fs.Bool("dry-run", false, "print the docker command instead of running it")
 	var envs envFlag
 	fs.Var(&envs, "env", "env var to pass into the container: NAME (from host) or NAME=VALUE; repeatable")
+	var services envFlag
+	fs.Var(&services, "service", "service image to start detached first, e.g. postgres:16 or db=postgres:16; repeatable, left running afterwards")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
 	opts := container.Options{
-		Image:  *image,
-		Dir:    *dir,
-		Env:    []string(envs),
-		DryRun: *dryRun,
+		Image:    *image,
+		Dir:      *dir,
+		Env:      []string(envs),
+		Services: []string(services),
+		DryRun:   *dryRun,
 	}
 
 	if *workflowFile != "" {
@@ -270,8 +303,8 @@ func runRun(args []string) int {
 		if len(info.Step.SkippedEnv) > 0 {
 			fmt.Fprintf(os.Stderr, "localci run: warning: env %s reference secrets or expressions — pass them with --env NAME=VALUE\n", strings.Join(info.Step.SkippedEnv, ", "))
 		}
-		if len(info.Services) > 0 {
-			fmt.Fprintf(os.Stderr, "localci run: warning: job uses services (%s) — localci run does not start them; start them yourself first\n", strings.Join(info.Services, ", "))
+		if len(info.Services) > 0 && len(services) == 0 {
+			fmt.Fprintf(os.Stderr, "localci run: warning: job uses services (%s) — localci run does not start them unless you pass --service <image>; start them yourself first\n", strings.Join(info.Services, ", "))
 		}
 	} else {
 		if fs.NArg() == 0 {
