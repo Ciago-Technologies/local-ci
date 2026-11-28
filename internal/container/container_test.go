@@ -110,6 +110,62 @@ func TestRun_DryRun(t *testing.T) {
 	}
 }
 
+func TestServiceContainerName(t *testing.T) {
+	cases := map[string]string{
+		"postgres:16":                   "localci-postgres",
+		"redis:7-alpine":                "localci-redis",
+		"db=postgres:16":                "localci-db",
+		"docker.io/library/postgres:16": "localci-postgres",
+	}
+	for in, want := range cases {
+		if got := ServiceContainerName(in); got != want {
+			t.Errorf("ServiceContainerName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := ServiceImage("db=postgres:16"); got != "postgres:16" {
+		t.Errorf("ServiceImage(db=postgres:16) = %q, want postgres:16", got)
+	}
+}
+
+func TestRun_DryRunWithService(t *testing.T) {
+	var out bytes.Buffer
+	code, err := Run(Options{Dir: t.TempDir(), DryRun: true, Services: []string{"postgres:16"}, Command: []string{"npm", "test"}}, &out, &bytes.Buffer{})
+	if err != nil || code != 0 {
+		t.Fatalf("dry run with service code=%d err=%v", code, err)
+	}
+	s := out.String()
+	for _, want := range []string{"docker run -d --name localci-postgres postgres:16", "docker run", "left running", "docker rm -f localci-postgres"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("dry run with service output missing %q:\n%s", want, s)
+		}
+	}
+}
+
+func TestRun_WithServiceStartsItFirst(t *testing.T) {
+	// Fake docker: record args, exit 0 for -d runs, exit 3 for the main run.
+	bin := t.TempDir()
+	script := "#!/bin/sh\necho \"FAKE-DOCKER $@\" >> \"" + filepath.Join(bin, "calls.txt") + "\"\nif [ \"$2\" = \"-d\" ]; then exit 0; fi\nexit 3\n"
+	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	var out, errOut bytes.Buffer
+	code, err := Run(Options{Dir: t.TempDir(), Services: []string{"postgres:16"}, Command: []string{"npm", "test"}}, &out, &errOut)
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3", code)
+	}
+	calls, _ := os.ReadFile(filepath.Join(bin, "calls.txt"))
+	if !strings.Contains(string(calls), "run -d --name localci-postgres postgres:16") {
+		t.Errorf("docker calls missing service start: %s", calls)
+	}
+	if !strings.Contains(errOut.String(), "localci-postgres") {
+		t.Errorf("stderr missing service reminder: %q", errOut.String())
+	}
+}
+
 func TestRun_MissingDocker(t *testing.T) {
 	// Empty PATH: no docker binary to find.
 	t.Setenv("PATH", t.TempDir())
