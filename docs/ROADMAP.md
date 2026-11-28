@@ -206,6 +206,41 @@ Exit criteria: someone who has never seen LocalCI can install it,
 run the demo, and understand the point in 30 seconds — and the
 repo's own CI is green.
 
+## v0.7.4 — Cover the remaining gaps (done 2026-11-28)
+
+Gap review on 2026-11-28 found Phases 3-7 already done on main
+(v0.7.3), so this release covers what was still open in
+GOOD_FIRST_ISSUES.md and the gap list:
+
+- Bun runtime: `bun --version` captured, `oven-sh/setup-bun`
+  parsed (setup + matrix + `bun test` heuristic), fix suggestions
+  use the right action name. Deno added the same way
+  (`denoland/setup-deno`).
+- `localci run --service`: repeatable `--service postgres:16`
+  (or `db=postgres:16`) starts services detached before the run,
+  prints `docker rm -f localci-<name>` to stop them; `--dry-run`
+  shows the service start commands. Default unchanged: no
+  services unless asked.
+- SARIF output: `localci diff --sarif -o out.sarif` writes
+  SARIF 2.1.0, one result per difference, level error/warning/note
+  by severity, rule id from the diff field, message = detail + fix.
+- GitLab MR comment: `examples/gitlab-ci.yml` now posts the diff
+  as an MR note via the GitLab API (`scripts/post-gitlab-mr.py`,
+  `CI_JOB_TOKEN`); best-effort — the diff stays in the job log
+  and the job still fails on differences if posting fails.
+- Tools inventory (scoped system-package gap): `capture` now
+  records versions of git, docker, make, gcc and curl when present
+  on PATH, diffed as `tool:<name>` with fixes. A full package
+  inventory is still deliberately not done (too big, too noisy).
+- macOS verify: `scripts/verify-macos.sh` — run on a real Mac,
+  it builds, captures and checks os/memory/os_release. Still
+  open: needs a Mac to run (this VM is Linux).
+- Awesome lists: draft submission text in `docs/AWESOME.md`;
+  still open: an actual PR to a list needs a maintainer.
+
+Tests: 50+ passing (bun/deno, tools, SARIF, service dry-run +
+fake-docker start-first, workflow bun parsing); `go vet` clean.
+
 ## Non-goals
 
 - Running full GitHub Actions workflows locally
