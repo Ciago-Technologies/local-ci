@@ -27,6 +27,28 @@ func Suggest(d Difference) string {
 
 	// Runtimes.
 	if name, ok := strings.CutPrefix(field, "runtime:"); ok {
+		// Bun's setup action lives under oven-sh, not actions/.
+		if name == "bun" {
+			switch d.Detail {
+			case "missing in CI":
+				return fmt.Sprintf("Add oven-sh/setup-bun in .github/workflows (with bun-version: %s).", d.A)
+			case "missing locally":
+				return fmt.Sprintf("Install bun %s locally to match CI (https://bun.sh).", d.B)
+			default:
+				return fmt.Sprintf("Pin bun-version: %s in oven-sh/setup-bun, or update your local bun to %s.", d.B, d.B)
+			}
+		}
+		// Deno's setup action lives under denoland, not actions/.
+		if name == "deno" {
+			switch d.Detail {
+			case "missing in CI":
+				return fmt.Sprintf("Add denoland/setup-deno in .github/workflows (with deno-version: %s).", d.A)
+			case "missing locally":
+				return fmt.Sprintf("Install deno %s locally to match CI (https://deno.com).", d.B)
+			default:
+				return fmt.Sprintf("Pin deno-version: %s in denoland/setup-deno, or update your local deno to %s.", d.B, d.B)
+			}
+		}
 		switch d.Detail {
 		case "missing in CI":
 			return fmt.Sprintf("Add a setup step for %s %s in .github/workflows (e.g. actions/setup-%s with version %s).", name, d.A, name, d.A)
@@ -37,6 +59,18 @@ func Suggest(d Difference) string {
 				return fmt.Sprintf("Pin %s-version: %s in the workflow's setup step and install %s %s locally — the major version changed.", name, d.B, name, d.B)
 			}
 			return fmt.Sprintf("Pin %s-version: %s in the workflow, or update your local %s to %s.", name, d.B, name, d.B)
+		}
+	}
+
+	// Tools.
+	if name, ok := strings.CutPrefix(field, "tool:"); ok {
+		switch d.Detail {
+		case "missing in CI":
+			return fmt.Sprintf("Install %s %s in CI (add it to the workflow, or use a runner image that includes it).", name, d.A)
+		case "missing locally":
+			return fmt.Sprintf("Install %s %s locally to match CI.", name, d.B)
+		default:
+			return fmt.Sprintf("Update %s to %s on both sides — a version drift in a CI tool can change behaviour.", name, d.B)
 		}
 	}
 
